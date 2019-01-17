@@ -1,0 +1,8 @@
+**/__pycache__/
+/.idea/
+/build/
+/dist/
+**/.pytest_cache/
+*.db*
+*.egg-info/
+/cimpyorm/config.ini

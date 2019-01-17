@@ -1,0 +1,7 @@
+sqlalchemy
+networkx
+numpy
+pytest
+pytest-cov
+lxml
+pylint

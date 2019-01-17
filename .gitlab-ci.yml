@@ -1,0 +1,40 @@
+image: docker:git
+services:
+- docker:dind
+
+stages:
+- build
+- test
+
+variables:
+  DOCKER_DRIVER: overlay2
+  CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE:$CI_BUILD_REF_SLUG
+  CONTAINER_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
+  CACHE_IMAGE: $CI_REGISTRY_IMAGE:cache
+
+build:
+  tags:
+    - shell
+  stage: build
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+    - docker build --cache-from $CACHE_IMAGE -t $CONTAINER_TEST_IMAGE -t $CACHE_IMAGE .
+    - docker push $CONTAINER_TEST_IMAGE
+    - docker push $CACHE_IMAGE
+
+pytest-and-do-cov:
+  tags:
+    - dind
+  stage: test
+  image: $CONTAINER_TEST_IMAGE
+  script:
+    - pytest --cov --runslow
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
+pylint:
+  tags:
+    - dind
+  stage: test
+  image: $CONTAINER_TEST_IMAGE
+  script:
+    - ./pylint.sh

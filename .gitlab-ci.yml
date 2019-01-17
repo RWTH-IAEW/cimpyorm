@@ -14,7 +14,7 @@ variables:
 
 build:
   tags:
-    - shell
+    - linux
   stage: build
   script:
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
@@ -24,7 +24,7 @@ build:
 
 pytest-and-do-cov:
   tags:
-    - dind
+    - docker
   stage: test
   image: $CONTAINER_TEST_IMAGE
   script:
@@ -33,7 +33,7 @@ pytest-and-do-cov:
 
 pylint:
   tags:
-    - dind
+    - docker
   stage: test
   image: $CONTAINER_TEST_IMAGE
   script:

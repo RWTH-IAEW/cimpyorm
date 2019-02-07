@@ -18,8 +18,8 @@ from sqlalchemy import Column, String, ForeignKey, Integer, Float, Boolean
 from sqlalchemy.orm import relationship, backref
 
 from cimpyorm import log
-import cimpyorm.Backend.auxiliary as aux
-from cimpyorm.Backend.Parseable import Parseable
+import cimpyorm.Model.auxiliary as aux
+from cimpyorm.Model.Parseable import Parseable
 
 
 __all__ = ["CIMPackage", "CIMClass", "CIMProp", "CIMDTProperty",
@@ -35,7 +35,7 @@ class SchemaElement(aux.Base):
     __tablename__ = "SchemaElement"
     nsmap = None
     XPathMap = None
-    name = Column(String(50), primary_key=True)
+    name = Column(String(80), primary_key=True)
     label = Column(String(50))
     namespace = Column(String(30))
     type_ = Column(String(50))
@@ -61,7 +61,6 @@ class SchemaElement(aux.Base):
         self.name = self._name
         self.label = self._label
         self.namespace = self._namespace
-        #self.comment = self._comment
         self.Map = None
 
     @staticmethod
@@ -146,7 +145,7 @@ class SchemaElement(aux.Base):
 
 class CIMEnum(SchemaElement):
     __tablename__ = "CIMEnum"
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
 
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -188,7 +187,7 @@ class CIMEnum(SchemaElement):
 
 class CIMEnumValue(SchemaElement):
     __tablename__ = "CIMEnumValue"
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
     enum_name = Column(String(50), ForeignKey(CIMEnum.name))
     enum = relationship(CIMEnum, foreign_keys=enum_name, backref="values")
 
@@ -231,7 +230,7 @@ class CIMEnumValue(SchemaElement):
 
 class CIMPackage(SchemaElement):
     __tablename__ = "CIMPackage"
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
 
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -251,7 +250,7 @@ class CIMClass(SchemaElement):
     """
     __tablename__ = "CIMClass"
 
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
     package_name = Column(String(50), ForeignKey(CIMPackage.name))
     package = relationship(CIMPackage, foreign_keys=package_name, backref="classes")
     parent_name = Column(String(50), ForeignKey("CIMClass.name"))
@@ -434,6 +433,12 @@ class CIMClass(SchemaElement):
                             argmap[prop.key] = value.lower() == "true"
                         elif t == "Integer":
                             argmap[prop.key] = int(value)
+                        elif len([v for v in value.split("#") if v])>1:
+                            log.warning(
+                                f"Ambiguous data values for {self.name}:{prop.key}: {len(set(value))} unique values. "
+                                f"(Skipped)")
+                            # If reference doesn't resolve value is set to None (Validation
+                            # has to catch missing obligatory values)
                         else:
                             argmap[prop.key] = value.replace("#", "")
                     except ValueError:
@@ -448,7 +453,7 @@ class CIMClass(SchemaElement):
 
 class CIMDT(SchemaElement):
     __tablename__ = "CIMDT"
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
     package_name = Column(String(50), ForeignKey(CIMPackage.name))
     package = relationship(CIMPackage, foreign_keys=package_name, backref="datatypes")
     stereotype = Column(String(30))
@@ -510,7 +515,7 @@ class CIMDT(SchemaElement):
 
 class CIMDTProperty(SchemaElement):
     __tablename__ = "CIMDTProperty"
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
     belongs_to_name = Column(String(50), ForeignKey(CIMDT.name))
     belongs_to = relationship(CIMDT, foreign_keys=belongs_to_name, backref="props")
     multiplicity = Column(String(10))
@@ -576,7 +581,7 @@ class CIMDTProperty(SchemaElement):
 
 class CIMDTUnit(CIMDTProperty):
     __tablename__ = "CIMDTUnit"
-    name = Column(String(50), ForeignKey(CIMDTProperty.name), primary_key=True)
+    name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name, backref=backref("unit", uselist=False))
     symbol_name = Column(String(50), ForeignKey(CIMEnumValue.name))
     symbol = relationship(CIMEnumValue, foreign_keys=symbol_name)
@@ -620,7 +625,7 @@ class CIMDTUnit(CIMDTProperty):
 
 class CIMDTValue(CIMDTProperty):
     __tablename__ = "CIMDTValue"
-    name = Column(String(50), ForeignKey(CIMDTProperty.name), primary_key=True)
+    name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("value", uselist=False))
     datatype_name = Column(String(50), ForeignKey(CIMDT.name))
@@ -660,7 +665,7 @@ class CIMDTValue(CIMDTProperty):
 
 class CIMDTMultiplier(CIMDTProperty):
     __tablename__ = "CIMDTMultiplier"
-    name = Column(String(50), ForeignKey(CIMDTProperty.name), primary_key=True)
+    name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("multiplier", uselist=False))
     value_name = Column(String(50), ForeignKey(CIMEnumValue.name))
@@ -706,7 +711,7 @@ class CIMDTMultiplier(CIMDTProperty):
 
 class CIMDTDenominatorUnit(CIMDTProperty):
     __tablename__ = "CIMDTDenominatorUnit"
-    name = Column(String(50), ForeignKey(CIMDTProperty.name), primary_key=True)
+    name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("denominator_unit", uselist=False))
 
@@ -717,7 +722,7 @@ class CIMDTDenominatorUnit(CIMDTProperty):
 
 class CIMDTDenominatorMultiplier(CIMDTProperty):
     __tablename__ = "CIMDTDenominatorMultiplier"
-    name = Column(String(50), ForeignKey(CIMDTProperty.name), primary_key=True)
+    name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("denominator_multiplier", uselist=False))
 
@@ -733,13 +738,13 @@ class CIMProp(SchemaElement):
     __tablename__ = "CIMProp"
     XPathMap = None
 
-    name = Column(String(50), ForeignKey(SchemaElement.name), primary_key=True)
+    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
     prop_name = Column(String(50))
     cls_name = Column(String(50), ForeignKey(CIMClass.name))
     cls = relationship(CIMClass, foreign_keys=cls_name, backref="props")
     datatype_name = Column(String(50), ForeignKey(CIMDT.name))
     datatype = relationship(CIMDT, foreign_keys=datatype_name, backref="usedby")
-    inverse_property_name = Column(String(50), ForeignKey("CIMProp.name"))
+    inverse_property_name = Column(String(80), ForeignKey("CIMProp.name"))
     inverse = relationship("CIMProp", foreign_keys=inverse_property_name, uselist=False)
     domain_name = Column(String(50), ForeignKey(CIMClass.name))
     domain = relationship(CIMClass, foreign_keys=domain_name, backref="domain_elements")

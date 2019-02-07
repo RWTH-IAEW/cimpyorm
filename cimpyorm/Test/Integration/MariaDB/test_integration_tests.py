@@ -3,31 +3,31 @@ import os
 import pytest
 import cimpyorm
 
+from cimpyorm.backend import MariaDB
 
-@pytest.mark.slow
+
 def test_parse_load(full_grid):
     try:
         cimpyorm.get_path("SCHEMAROOT")
     except KeyError:
         pytest.skip(f"Schemata not configured")
-    path = os.path.join(full_grid, ".integration_test.db")
-    session, m = parse(full_grid, db_name=path)
+    path = "integration_test"
+    session, m = parse(full_grid, MariaDB(path=path, host="mariadb"))
     session.close()
-    session, m = load(path)
+    session, m = load(MariaDB(path=path, host="mariadb"))
     session.close()
-    os.remove(path)
+    MariaDB(path=path, host="mariadb").drop()
 
 
-@pytest.mark.slow
 def test_parse_parse(full_grid):
     try:
         cimpyorm.get_path("SCHEMAROOT")
     except KeyError:
         pytest.skip(f"Schemata not configured")
-    path = os.path.join(full_grid, ".integration_test.db")
-    session, m = parse(full_grid, db_name=path)
+    path = "integration_test"
+    session, m = parse(full_grid, MariaDB(path=path, host="mariadb"))
     session.close()
-    session, m = parse(full_grid, db_name=path)
+    session, m = parse(full_grid, MariaDB(path=path, host="mariadb"))
     assert session.query(m.Terminal).first().ConductingEquipment
     session.close()
-    os.remove(path)
+    MariaDB(path=path, host="mariadb").drop()

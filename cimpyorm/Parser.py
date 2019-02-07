@@ -15,12 +15,10 @@ from collections import defaultdict
 from functools import lru_cache
 
 from networkx import bfs_tree
-import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
 
 from cimpyorm import log
 from cimpyorm.common import parseable_files
-from cimpyorm.Backend.auxiliary import HDict
+from cimpyorm.Model.auxiliary import HDict
 
 
 def prepare_path(dataset, db_name=None):
@@ -229,17 +227,3 @@ def shorten_namespace(elements, nsmap):
     if not islist and len(names) == 1:
         names = names[0]
     return names
-
-
-def bind_db(echo=False, database=":memory:"):
-    """
-
-    :param echo:
-    :param database:
-    :return:
-    """
-    log.info(f"Database: {database}")
-    engine = sa.create_engine(f"sqlite:///{database}", echo=echo)
-    Session = sessionmaker(bind=engine)
-    db_session = Session()
-    return engine, db_session

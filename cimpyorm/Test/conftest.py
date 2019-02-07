@@ -3,10 +3,12 @@ import os
 import logging
 
 # Keep import for _CONFIGPATH - otherwise get_path fails because cimpyorm/__init__.py locals aren't present
+import cimpyorm.backend
+import cimpyorm.common
 from cimpyorm import get_path
 import cimpyorm.Parser
 from cimpyorm.api import load
-from cimpyorm.Backend.auxiliary import HDict
+from cimpyorm.Model.auxiliary import HDict
 logging.disable(logging.CRITICAL)
 
 
@@ -24,7 +26,9 @@ def full_grid():
 
 @pytest.fixture(scope="module")
 def acquire_db():
-    engine, session = cimpyorm.Parser.bind_db(database=":memory:")
+    backend = cimpyorm.backend.SQLite()
+    engine = backend.engine
+    session = backend.session
     return engine, session
 
 
@@ -34,12 +38,12 @@ def load_test_db():
     Returns a session and a model for a database that's only supposed to be read from
     :return: session, m
     """
-    try:
-        path = os.path.join(get_path("DATASETROOT"), "FullGrid", "StaticTest.db")
-        session, m = load(path)
-        return session, m
-    except (KeyError, FileNotFoundError):
+    path = os.path.join(get_path("DATASETROOT"), "FullGrid", "StaticTest.db")
+    if not os.path.isfile(path):
         pytest.skip("StaticTest.db not present.")
+    session, m = load(path)
+    return session, m
+
 
 
 @pytest.fixture(scope="session")
@@ -50,7 +54,7 @@ def dummy_source():
         pytest.skip(f"Dataset path not configured")
     if not os.path.isfile(path):
         pytest.skip("Dataset 'FullGrid' not present.")
-    from cimpyorm.Backend.Source import SourceInfo
+    from cimpyorm.Model.Source import SourceInfo
     ds = SourceInfo(source_file=path, source_id=1)
     return ds
 

@@ -17,7 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cimpyorm import log
-from cimpyorm.Backend.Instance import Schema
+from cimpyorm.Model.Instance import Schema
 
 
 def generate_schema(rdfs_path=None, session=None):
@@ -27,7 +27,7 @@ def generate_schema(rdfs_path=None, session=None):
     :param session: (optional) sqlalchemy session
     :return: classes and their inheritance hierarchy
     """
-    from cimpyorm.Backend.Instance import SchemaInfo
+    from cimpyorm.Model.Instance import SchemaInfo
     if not rdfs_path:
         raise FileNotFoundError("Failed to find schema file. Please provide one.")
     tree = merge(rdfs_path)

@@ -20,7 +20,7 @@ import lxml.etree as et
 from sqlalchemy import Column, Integer, String, TEXT
 
 from cimpyorm import log
-import cimpyorm.Backend.auxiliary as aux
+import cimpyorm.Model.auxiliary as aux
 
 
 class SourceInfo(aux.Base):
@@ -30,7 +30,7 @@ class SourceInfo(aux.Base):
     __tablename__ = "SourceInfo"
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(50))
-    uuid = Column(Integer)
+    uuid = Column(String(50))
     FullModel = Column(TEXT)
     namespaces = Column(TEXT)
 

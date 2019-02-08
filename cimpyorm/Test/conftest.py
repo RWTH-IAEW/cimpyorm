@@ -5,7 +5,6 @@ import logging
 # Keep import for _CONFIGPATH - otherwise get_path fails because cimpyorm/__init__.py locals aren't present
 
 from cimpyorm import get_path
-from cimpyorm.Model.auxiliary import HDict
 logging.disable(logging.CRITICAL)
 
 
@@ -60,6 +59,7 @@ def dummy_source():
 
 @pytest.fixture(scope="session")
 def dummy_nsmap():
+    from cimpyorm.Model.auxiliary import HDict
     nsmap = HDict({'cim': 'http://iec.ch/TC57/2013/CIM-schema-cim16#',
                    'entsoe': 'http://entsoe.eu/CIM/SchemaExtension/3/1#',
                    'md': 'http://iec.ch/TC57/61970-552/ModelDescription/1#',

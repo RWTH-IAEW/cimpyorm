@@ -112,7 +112,7 @@ class Schema:
             enum_.v = Namespace(**{value.label: value for value in enum_.values})
         return Namespace(**{c.name: c.class_ for c in self.session.query(CIMClass).all()},
                          **{"dt": Namespace(**{c.name: c for c in self.session.query(CIMDT).all()})},
-                         **{"c": Namespace(**{c.name: c for c in self.session.query(CIMClass).all()})},
+                         **{"classes": Namespace(**{c.name: c for c in self.session.query(CIMClass).all()})},
                          **{"enum": Namespace(**{c.name: c for c in self.session.query(CIMEnum).all()})})
 
     def _generate(self):

@@ -9,9 +9,11 @@
 #  For further information see LICENSE in the project's root directory.
 #
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from typing import Union
 
+import pandas as pd
+from tabulate import tabulate
 from lxml import etree
 from lxml.etree import XPath
 from sqlalchemy import Column, String, ForeignKey, Integer, Float, Boolean
@@ -183,6 +185,13 @@ class CIMEnum(SchemaElement):
         :return: str
         """
         return self._raw_property("category")
+
+    def __repr__(self):
+        table = defaultdict(list)
+        for value in self.values:
+            table["Value"].append(value.label)
+        df = pd.DataFrame(table)
+        return tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
 
 
 class CIMEnumValue(SchemaElement):
@@ -450,6 +459,61 @@ class CIMClass(SchemaElement):
                 # has to catch missing obligatory values)
         return argmap
 
+    def __repr__(self):
+        table = defaultdict(list)
+        for key, prop in self.all_props.items():
+            table["Label"].append(key)
+            table["Domain"].append(prop.domain.name)
+            table["Multiplicity"].append(prop.multiplicity)
+            try:
+                table["Datatype"].append(prop.datatype.label)
+            except AttributeError:
+                table["Datatype"].append(f"*{prop.range.label}")
+            try:
+                nominator_unit = prop.datatype.unit.symbol.label
+                if nominator_unit.lower() == "none":
+                    nominator_unit = None
+            except AttributeError:
+                nominator_unit = None
+            try:
+                denominator_unit = prop.datatype.denominator_unit.symbol.label
+                if denominator_unit.lower() == "none":
+                    denominator_unit = None
+            except AttributeError:
+                denominator_unit = None
+            if nominator_unit and denominator_unit:
+                table["Unit"].append(f"{nominator_unit}/{denominator_unit}")
+            elif nominator_unit:
+                table["Unit"].append(f"{nominator_unit}")
+            elif denominator_unit:
+                table["Unit"].append(f"1/{denominator_unit}")
+            else:
+                table["Unit"].append("-")
+
+            try:
+                nominator_mpl = prop.datatype.multiplier.value.label
+                if nominator_mpl.lower() == "none":
+                    nominator_mpl = None
+            except AttributeError:
+                nominator_mpl = None
+            try:
+                denominator_mpl = prop.datatype.denominator_multiplier.value.label
+                if denominator_mpl.lower() == "none":
+                    denominator_mpl = None
+            except AttributeError:
+                denominator_mpl = None
+            if nominator_mpl and denominator_mpl:
+                table["Multiplier"].append(f"{nominator_mpl}/{denominator_mpl}")
+            elif nominator_mpl:
+                table["Multiplier"].append(f"{nominator_mpl}")
+            elif denominator_mpl:
+                table["Multiplier"].append(f"1/{denominator_mpl}")
+            else:
+                table["Multiplier"].append("-")
+
+        df = pd.DataFrame(table)
+        return tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
+
 
 class CIMDT(SchemaElement):
     __tablename__ = "CIMDT"
@@ -714,10 +778,44 @@ class CIMDTDenominatorUnit(CIMDTProperty):
     name = Column(String(80), ForeignKey(CIMDTProperty.name), primary_key=True)
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("denominator_unit", uselist=False))
+    symbol_name = Column(String(50), ForeignKey(CIMEnumValue.name))
+    symbol = relationship(CIMEnumValue, foreign_keys=symbol_name)
 
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
     }
+
+    def __init__(self, description):
+        """
+        Class constructor
+        :param description: the (merged) xml node element containing the enums's description
+        """
+        super().__init__(description)
+        self.Attributes = self._raw_Attributes()
+        self.symbol_name = self._symbol
+
+    @staticmethod
+    def _raw_Attributes():
+        return {**CIMDTProperty._raw_Attributes(),
+                **{"isFixed": None}}
+
+    @classmethod
+    def _generateXPathMap(cls):
+        super()._generateXPathMap()
+        Map = {"isFixed": XPath(r"cims:isFixed/@rdfs:Literal", namespaces=cls.nsmap)}
+        if not cls.XPathMap:
+            cls.XPathMap = Map
+        else:
+            cls.XPathMap = {**cls.XPathMap, **Map}
+
+    @property
+    @aux.prefix_ns
+    def _symbol(self):
+        """
+        Return the enums' category as determined from the schema
+        :return: str
+        """
+        return f"UnitSymbol.{self._raw_property('isFixed')}"
 
 
 class CIMDTDenominatorMultiplier(CIMDTProperty):
@@ -726,9 +824,44 @@ class CIMDTDenominatorMultiplier(CIMDTProperty):
     belongs_to = relationship(CIMDT, foreign_keys=CIMDTProperty.belongs_to_name,
                               backref=backref("denominator_multiplier", uselist=False))
 
+    value_name = Column(String(50), ForeignKey(CIMEnumValue.name))
+    value = relationship(CIMEnumValue, foreign_keys=value_name)
+
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
     }
+
+    def __init__(self, description):
+        """
+        Class constructor
+        :param description: the (merged) xml node element containing the enums's description
+        """
+        super().__init__(description)
+        self.Attributes = self._raw_Attributes()
+        self.value_name = self._value
+
+    @staticmethod
+    def _raw_Attributes():
+        return {**CIMDTProperty._raw_Attributes(),
+                **{"isFixed": None}}
+
+    @classmethod
+    def _generateXPathMap(cls):
+        super()._generateXPathMap()
+        Map = {"isFixed": XPath(r"cims:isFixed/@rdfs:Literal", namespaces=cls.nsmap)}
+        if not cls.XPathMap:
+            cls.XPathMap = Map
+        else:
+            cls.XPathMap = {**cls.XPathMap, **Map}
+
+    @property
+    @aux.prefix_ns
+    def _value(self):
+        """
+        Return the enums' category as determined from the schema
+        :return: str
+        """
+        return f"UnitMultiplier.{self._raw_property('isFixed')}"
 
 
 class CIMProp(SchemaElement):

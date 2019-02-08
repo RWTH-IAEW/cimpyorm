@@ -108,4 +108,7 @@ with open(_CONFIGPATH, "w+") as f:
     # Update config.ini
     CONFIG.write(f)
 
-from cimpyorm.api import parse, load  # pylint: disable=wrong-import-position
+try:
+    from cimpyorm.api import parse, load  # pylint: disable=wrong-import-position
+except ModuleNotFoundError:
+    log.warning(f"Unfulfilled requirements. parse and load are not available.")

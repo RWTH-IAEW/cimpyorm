@@ -410,10 +410,16 @@ class CIMClass(SchemaElement):
 
     @property
     def all_props(self):
+        _all_props = {}
+        for prop in self.props:
+            if prop.namespace is None or prop.namespace == "cim":
+                _all_props[prop.label] = prop
+            else:
+                _all_props[f"{prop.namespace}_{prop.label}"] = prop
         if self.parent:
-            return {**self.parent.all_props, **{prop.label: prop for prop in self.props}}
+            return {**self.parent.all_props, **_all_props}
         else:
-            return {prop.label: prop for prop in self.props}
+            return _all_props
 
     def create(self, el, attrib, nsmap):  # pylint: disable=inconsistent-return-statements
         if attrib == "ID":
@@ -512,7 +518,19 @@ class CIMClass(SchemaElement):
                 table["Multiplier"].append("-")
 
         df = pd.DataFrame(table)
-        return tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
+        tab = tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
+        c = self
+        inh = {}
+        inh["Hierarchy"] = [c.name]
+        inh["Number of native properties"] = [len(c.props)]
+        while c.parent:
+            inh["Hierarchy"].append(c.parent.name)
+            inh["Number of native properties"].append(len(c.parent.props))
+            c = c.parent
+        [val.reverse() for val in inh.values()]
+        inh = tabulate(pd.DataFrame(inh),
+                       headers="keys", showindex=False, tablefmt="psql", stralign="right")
+        return inh + "\n" + tab
 
 
 class CIMDT(SchemaElement):

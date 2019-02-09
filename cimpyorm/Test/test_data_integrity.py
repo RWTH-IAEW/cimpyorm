@@ -26,3 +26,10 @@ def test_relationship(load_test_db):
         m.Terminal.id == "_800ada75-8c8c-4568-aec5-20f799e45f3c"
     ).one().ConnectivityNode, m.ConnectivityNode)
 
+
+def test_alter_data(load_test_db):
+    session, m = load_test_db
+    obj = session.query(m.IdentifiedObject).first()
+    obj.entsoe_energyIdentCodeEic = "YetAnotherCode"
+    session.commit()
+    assert session.query(m.IdentifiedObject).first().entsoe_energyIdentCodeEic == "YetAnotherCode"

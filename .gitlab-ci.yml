@@ -56,6 +56,7 @@ pylint:
     - docker
   image: $CONTAINER_TEST_IMAGE
   stage: test:integration
+  retry: 1
   except: 
     - Releases
 
@@ -118,7 +119,7 @@ upload:
   script:
     - pip install -q twine toml requests pytest
     - twine upload --repository-url $PYPI_ENDPOINT --u $PYPI_USER --p $PYPI_PASSWORD dist/*
-    - sleep 5
+    - sleep 20
     - pytest cimpyorm/Test/Deployment
   dependencies:
     - build_dist

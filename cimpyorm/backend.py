@@ -89,8 +89,10 @@ class SQLite(Engine):
         self.path = db_path
 
     def _connect_engine(self):
+        # ToDo: Disabling same_thread check is only treating the symptoms, however, without it, property changes
+        #       can't be committed
         return sa.create_engine(f"{self._prefix()}:///{self.path}",
-                                echo=self.echo)
+                                echo=self.echo, connect_args={"check_same_thread": False})
 
 
 class ClientServer(Engine):

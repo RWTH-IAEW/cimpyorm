@@ -22,10 +22,25 @@ project = 'cimpyorm'
 copyright = '2019, Institute for High Voltage Technology, RWTH Aachen'
 author = 'Thomas Offergeld'
 
-# The short X.Y version
-version = "0.4"
-# The full version, including alpha/beta/rc tags
-release = "0.4.3"
+try:
+    _rtd = os.environ["READTHEDOCS"] == "True"
+except KeyError:
+    _rtd = False
+
+if not _rtd:
+    import toml
+    from pathlib import Path
+    from cimpyorm import get_path
+
+    _path = Path(get_path("PACKAGEROOT")).parent
+    _toml_meta = toml.loads(open(os.path.join(_path, "pyproject.toml")).read())
+    _toml_name = _toml_meta["tool"]["poetry"]["name"]
+    _toml_version = _toml_meta["tool"]["poetry"]["version"]
+
+    # The short X.Y version
+    version = ".".join(_toml_version.split(".")[0:2])
+    # The full version, including alpha/beta/rc tags
+    release = _toml_version
 
 # -- General configuration ---------------------------------------------------
 

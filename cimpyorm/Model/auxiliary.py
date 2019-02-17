@@ -25,6 +25,11 @@ class HDict(dict):
         return hash(frozenset(self.items()))
 
 
+def chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
+
+
 def merge_descriptions(descriptions):
     """
     Returns the descriptions for a CIM class merged into only one description

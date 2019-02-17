@@ -21,6 +21,7 @@ class Parseable:
     Map = {}
     _about_ref = None
     ObjectName = None
+    _schema_class = None
 
     @classmethod
     def compile_map(cls, nsmap):
@@ -43,3 +44,7 @@ class Parseable:
         """
         print(f"Fields available for class {cls.__name__}")
         [print(var) for var in vars(cls).keys() if not var.startswith("_")]  # pylint: disable=expression-not-assigned
+
+    @classmethod
+    def describe(cls, fmt="psql"):
+        cls._schema_class.describe(fmt)

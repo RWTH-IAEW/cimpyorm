@@ -108,6 +108,11 @@ with open(_CONFIGPATH, "w+") as f:
     # Update config.ini
     CONFIG.write(f)
 
+
+def describe(element, fmt="psql"):
+    element.describe(fmt)
+
+
 try:
     from cimpyorm.api import parse, load  # pylint: disable=wrong-import-position
 except ModuleNotFoundError:

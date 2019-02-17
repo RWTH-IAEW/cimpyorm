@@ -16,7 +16,7 @@ import pandas as pd
 from tabulate import tabulate
 from lxml import etree
 from lxml.etree import XPath
-from sqlalchemy import Column, String, ForeignKey, Integer, Float, Boolean
+from sqlalchemy import Column, String, ForeignKey, Integer, Float, Boolean, Table
 from sqlalchemy.orm import relationship, backref
 
 from cimpyorm import log
@@ -144,6 +144,9 @@ class SchemaElement(aux.Base):
                 self.Attributes[property_identifier] = [result for result in set(results)]
         return self.Attributes[property_identifier]
 
+    def describe(self, fmt="psql"):
+        print(self)
+
 
 class CIMEnum(SchemaElement):
     __tablename__ = "CIMEnum"
@@ -186,12 +189,12 @@ class CIMEnum(SchemaElement):
         """
         return self._raw_property("category")
 
-    def __repr__(self):
+    def describe(self, fmt="psql"):
         table = defaultdict(list)
         for value in self.values:
             table["Value"].append(value.label)
         df = pd.DataFrame(table)
-        return tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
+        print(tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right"))
 
 
 class CIMEnumValue(SchemaElement):
@@ -351,6 +354,8 @@ class CIMClass(SchemaElement):
                 "polymorphic_on": attrs["type_"],
                 "polymorphic_identity": self.name}
 
+        attrs["_schema_class"] = self
+
         if self.parent:
             self.class_ = type(self.name, (self.parent.class_,), attrs)
         else: # Base class
@@ -360,36 +365,6 @@ class CIMClass(SchemaElement):
     def generate(self, nsmap):
         for prop in self.props:
             prop.generate(nsmap)
-
-    def parse_data(self, root, attrib):
-        """
-        Parse objects from snapshot related to this class
-        :param root: root of the snapshot XML tree
-        :param attrib: "ID" or "about"
-        :return: Parsed elements as CIM objects
-        """
-        nsmap = root.nsmap
-        elements = []
-        try:
-            xml_elements = root.xpath(f"{self.namespace}:{self.label}[@rdf:{attrib}]", namespaces=nsmap)
-            if xml_elements:
-                for el in xml_elements:
-                    # Create Objects of CIM-class
-                    if attrib == "ID":
-                        # noinspection PyArgumentList
-                        elements.append(self.create(el, attrib, nsmap))
-                    elif attrib == "about":
-                        # noinspection PyArgumentList
-                        elements.append(self.create(el, attrib, nsmap))
-            else:
-                log.debug(f"Skipped {self.namespace}:{self.label}. No elements.")
-        except (AttributeError, IndexError) as e:
-            raise type(e)(str(e) + f". Class is {self.namespace}:{self.label}")
-        if elements:
-            log.debug(
-                f"Touched {len(elements):,} elements of type "
-                f"{self.namespace}:{self.label}.")
-        return elements
 
     def _generate_map(self):
         """
@@ -421,21 +396,31 @@ class CIMClass(SchemaElement):
         else:
             return _all_props
 
-    def create(self, el, attrib, nsmap):  # pylint: disable=inconsistent-return-statements
-        if attrib == "ID":
-            return self.class_(id=el.get(f"{{{nsmap['rdf']}}}{attrib}"), **self._build_map(el))
-        elif attrib == "about":
-            return self.class_(_about_ref=el.get(f"{{{nsmap['rdf']}}}{attrib}").replace("#", ""), **self._build_map(el))
-
-    def _build_map(self, el):
+    def _build_map(self, el, session):
         if not self.parent:
             argmap = {}
         else:
-            argmap = self.parent._build_map(el)
+            argmap = self.parent._build_map(el, session)
         props = [prop for prop in self.props if prop.used]
         for prop in props:
             value = prop.xpath(el)
-            if len(value) == 1 or len(set(value)) == 1:
+            if prop.many_remote and prop.used:
+                _id = [el.attrib.values()[0]]
+                _remote_ids = []
+                if len(set(value)) > 1:
+                    for raw_value in value:
+                        _remote_ids = _remote_ids + [v for v in raw_value.split("#") if len(v)]
+                else:
+                    _remote_ids = [v for v in value[0].split("#") if len(v)]
+                _ids = _id * len(_remote_ids)
+                # Insert tuples in chunks of 400 elements max
+                for chunk in aux.chunks(list(zip(_ids, _remote_ids)), 400):
+                    _ins = prop.association_table.insert(
+                        [{f"{prop.domain.label}_id": _id,
+                          f"{prop.range.label}_id": _remote_id}
+                         for (_id, _remote_id) in chunk])
+                    session.execute(_ins)
+            elif len(value) == 1 or len(set(value)) == 1:
                 value = value[0]
                 if isinstance(prop.range, CIMEnum):
                     argmap[prop.key] = aux.map_enum(value, self.nsmap)
@@ -465,7 +450,7 @@ class CIMClass(SchemaElement):
                 # has to catch missing obligatory values)
         return argmap
 
-    def __repr__(self):
+    def describe(self, fmt="psql"):
         table = defaultdict(list)
         for key, prop in self.all_props.items():
             table["Label"].append(key)
@@ -516,9 +501,10 @@ class CIMClass(SchemaElement):
                 table["Multiplier"].append(f"1/{denominator_mpl}")
             else:
                 table["Multiplier"].append("-")
+            table["Inferred"].append(not prop.used)
 
         df = pd.DataFrame(table)
-        tab = tabulate(df, headers="keys", showindex=False, tablefmt="psql", stralign="right")
+        tab = tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right")
         c = self
         inh = {}
         inh["Hierarchy"] = [c.name]
@@ -529,8 +515,8 @@ class CIMClass(SchemaElement):
             c = c.parent
         [val.reverse() for val in inh.values()]
         inh = tabulate(pd.DataFrame(inh),
-                       headers="keys", showindex=False, tablefmt="psql", stralign="right")
-        return inh + "\n" + tab
+                       headers="keys", showindex=False, tablefmt=fmt, stralign="right")
+        print(inh + "\n" + tab)
 
 
 class CIMDT(SchemaElement):
@@ -929,6 +915,7 @@ class CIMProp(SchemaElement):
         self.key = None
         self.var_key = None
         self.xpath = None
+        self.association_table = None
 
     @staticmethod
     def _raw_Attributes():
@@ -1078,20 +1065,39 @@ class CIMProp(SchemaElement):
         attrs = {}
         Map = {}
         log.debug(f"Generating relationship for {var} on {self.name}")
-        attrs[f"{var}_id"] = Column(String(50),
-                                    ForeignKey(f"{self.range.label}.id"),
-                                    name=f"{var}_id")
-        if self.inverse:
-            br = self.inverse.label if self.namespace == "cim" else self.namespace+"_"+self.inverse.label
-            attrs[var] = relationship(self.range.label,
-                                      foreign_keys=attrs[f"{var}_id"],
-                                      backref=br)
+        if self.many_remote:
+            if self.inverse:
+                br = self.inverse.label if self.namespace == "cim" else self.namespace + "_" + self.inverse.label
+                tbl = self.generate_association_table()
+                self.association_table = tbl
+                attrs[var] = relationship(self.range.label,
+                                          secondary=tbl,
+                                          backref=br)
+            else:
+                tbl = self.generate_association_table()
+                attrs[var] = relationship(self.range.label,
+                                          secondary=tbl)
         else:
-            attrs[var] = relationship(self.range.label,
-                                      foreign_keys=attrs[f"{var}_id"])
-        self.key = f"{var}_id"
+            attrs[f"{var}_id"] = Column(String(50),
+                                        ForeignKey(f"{self.range.label}.id"),
+                                        name=f"{var}_id")
+            if self.inverse:
+                br = self.inverse.label if self.namespace == "cim" else self.namespace+"_"+self.inverse.label
+                attrs[var] = relationship(self.range.label,
+                                          foreign_keys=attrs[f"{var}_id"],
+                                          backref=br)
+            else:
+                attrs[var] = relationship(self.range.label,
+                                          foreign_keys=attrs[f"{var}_id"])
+            self.key = f"{var}_id"
         self.xpath = XPath(query_base + "/@rdf:resource", namespaces=nsmap)
         class_ = self.cls.class_
         for attr, attr_value in attrs.items():
             setattr(class_, attr, attr_value)
         return Map
+
+    def generate_association_table(self):
+        association_table = Table(f".asn_{self.domain.label}_{self.range.label}", aux.Base.metadata,
+                                  Column(f"{self.range.label}_id", String(50), ForeignKey(f"{self.range.label}.id")),
+                                  Column(f"{self.domain.label}_id", String(50), ForeignKey(f"{self.domain.label}.id")))
+        return association_table

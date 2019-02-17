@@ -14,26 +14,18 @@
 #
 import os
 import sys
-import toml
-from pathlib import Path
 sys.path.insert(0, os.path.abspath('/app/'))
-from cimpyorm import get_path
 
 # -- Project information -----------------------------------------------------
-
-_path = Path(get_path("PACKAGEROOT")).parent
-_toml_meta = toml.loads(open(os.path.join(_path, "pyproject.toml")).read())
-_toml_name = _toml_meta["tool"]["poetry"]["name"]
-_toml_version = _toml_meta["tool"]["poetry"]["version"]
 
 project = 'cimpyorm'
 copyright = '2019, Institute for High Voltage Technology, RWTH Aachen'
 author = 'Thomas Offergeld'
 
 # The short X.Y version
-version = ".".join(_toml_version.split(".")[0:2])
+version = "0.4"
 # The full version, including alpha/beta/rc tags
-release = _toml_version
+release = "0.4.3"
 
 # -- General configuration ---------------------------------------------------
 

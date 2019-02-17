@@ -133,7 +133,7 @@ upload:
   extends: .deploy_common
   stage: deploy:upload
   when: manual
-  allow_failure: false
+  allow_failure: true
   script:
     - pip install -q twine toml requests pytest
     - twine upload --repository-url $PYPI_ENDPOINT --u $PYPI_USER --p $PYPI_PASSWORD dist/*

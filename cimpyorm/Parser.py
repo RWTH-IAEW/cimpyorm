@@ -99,7 +99,7 @@ def parse_entries(entries, schema):
         if classname in classes.keys():
             for uuid, element in elements.items():
                     created.append(classes[classname].class_(id="_"+uuid,
-                                                             **classes[classname]._build_map(element)))
+                                                             **classes[classname]._build_map(element, schema.session)))
         else:
             log.info(f"{classname} not implemented. Skipping.")
     return created

@@ -10,14 +10,18 @@
 #
 
 import os
+from pathlib import Path
 from importlib import reload
 import configparser
+from typing import Union, Tuple
+from argparse import Namespace
 
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.session import Session
 
 from cimpyorm import common, get_path, log
 import cimpyorm.Model.auxiliary as aux
-from cimpyorm.backend import SQLite, Engine
+from cimpyorm.backend import SQLite, Engine, InMemory
 from cimpyorm.Model import Source
 
 
@@ -32,23 +36,28 @@ def configure(schemata=None, datasets=None):
         config.write(configfile)
 
 
-def load(db_path=None, echo=False):
+def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, Namespace]:
     """
-    Load a database from a .db file and make it queryable
-    :param db_path: path to the database (str or os.path)
-    :param schema:
-    :param echo:
-    :return: (db_session, model namespace)
+    Load an already parsed database from disk or connect to a server and yield a database session to start querying on
+    with the classes defined in the model namespace.
+
+    Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
+    :class:`~argparse.Namespace` return value.
+
+    :param path_to_db: Path to the cim snapshot or a :class:`~cimpyorm.backend.Engine`.
+    :param echo: Echo the SQL sent to the backend engine (SQLAlchemy option).
+
+    :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
     import cimpyorm.Model.Instance as Instance
     from cimpyorm.Model import Source
-    if isinstance(db_path, Engine):
-        _backend = db_path
+    if isinstance(path_to_db, Engine):
+        _backend = path_to_db
         _backend.echo = _backend.echo or echo
-    elif os.path.isfile(db_path):
-        _backend = SQLite(db_path, echo)
+    elif os.path.isfile(path_to_db):
+        _backend = SQLite(path_to_db, echo)
     else:
-        raise NotImplementedError(f"Unable to connect to database {db_path}")
+        raise NotImplementedError(f"Unable to connect to database {path_to_db}")
 
     engine = _backend.engine
     session = _backend.session
@@ -63,15 +72,21 @@ def load(db_path=None, echo=False):
     return session, model
 
 
-def parse(dataset, backend=SQLite()):
+def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Session, Namespace]:
     """
-    Parse a database into a .db file and make it queryable
-    :param dataset: path to the cim model (str or os.path)
+    Parse a database into a database backend and yield a database session to start querying on with the classes defined
+    in the model namespace.
 
-    :return: (db_session, model namespace)
+    Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
+    :class:`~argparse.Namespace` return value.
+
+    :param dataset: Path to the cim snapshot.
+    :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
+
+    :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
     from cimpyorm import Parser
-    backend.dataset = dataset
+    backend.dataset_loc = dataset
     # Reset database
     backend.drop()
     # And connect
@@ -82,7 +97,7 @@ def parse(dataset, backend=SQLite()):
     # ToDo: Move to Engines
     if engine.dialect.name == "mysql":
         log.debug("Deferring foreign key checks in mysql database.")
-        session.execute("set foreign_key_checks=0")
+        session.execute("SET foreign_key_checks='OFF'")
     elif engine.dialect.name == "postgresql":
         session.execute("SET CONSTRAINTS ALL DEFERRED")
 
@@ -107,7 +122,7 @@ def parse(dataset, backend=SQLite()):
 
     if engine.dialect.name == "mysql":
         log.debug("Enabling foreign key checks in mysql database.")
-        session.execute("set foreign_key_checks=1")
+        session.execute("SET foreign_key_checks='ON'")
 
     log.info("Exit.")
 
@@ -145,6 +160,6 @@ if __name__ == "__main__":
     # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
     #                        os.path.isdir(os.path.join(root, folder)) or
     #                        os.path.join(root, folder).endswith(".zip")])
-    db_session, m = parse(os.path.join(get_path("DATASETROOT"), "FullGrid"))
+    db_session, m = parse(os.path.join(get_path("DATASETROOT"), "FullGrid"), InMemory())
     print(db_session.query(m.IdentifiedObject).first().name)  # pylint: disable=no-member
     db_session.close()

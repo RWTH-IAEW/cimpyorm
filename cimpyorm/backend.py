@@ -95,6 +95,14 @@ class SQLite(Engine):
                                 echo=self.echo, connect_args={"check_same_thread": False})
 
 
+class InMemory(SQLite):
+    def _connect_engine(self):
+        # ToDo: Disabling same_thread check is only treating the symptoms, however, without it, property changes
+        #       can't be committed
+        return sa.create_engine(f"{self._prefix()}:///:memory:",
+                                echo=self.echo, connect_args={"check_same_thread": False})
+
+
 class ClientServer(Engine):
     def __init__(self, username=None, password=None, driver=None,
                  host=None, port=None, path=None, echo=False):

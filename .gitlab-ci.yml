@@ -9,6 +9,7 @@ stages:
 - deploy:build
 - deploy:check
 - deploy:upload
+- doc
 
 
 variables:
@@ -65,19 +66,36 @@ integration:MariaDB:
   services:
     - mariadb
   script:
-    - pytest cimpyorm/Test/Integration/MariaDB
+    - pytest --maxfail=1 cimpyorm/Test/Integration/MariaDB
 
 integration:MySQL:
   extends: .integration
   services:
     - mysql
   script:
-    - pytest cimpyorm/Test/Integration/MySQL
+    - pytest --maxfail=1 cimpyorm/Test/Integration/MySQL
 
 integration:SQLite:
   extends: .integration
   script:
-    - pytest cimpyorm/Test/Integration/SQLite
+    - pytest --maxfail=1 cimpyorm/Test/Integration/SQLite
+
+pages:
+  stage: doc
+  only:
+    - Releases
+  tags:
+    - docker
+  image: $CONTAINER_TEST_IMAGE
+  script:
+    - cd docs
+    - make html
+    - cd ..
+    - mkdir public
+    - mv docs/_build/html/* public
+  artifacts:
+    paths:
+    - public
 
 .deploy_common:
   only:

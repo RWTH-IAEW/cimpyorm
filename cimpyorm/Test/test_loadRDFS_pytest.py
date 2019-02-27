@@ -1,7 +1,6 @@
 import os
 import pytest
-from cimpyorm import get_path
-from cimpyorm.Model.auxiliary import find_rdfs_path
+from cimpyorm.auxiliary import get_path, find_rdfs_path
 
 
 @pytest.mark.parametrize("Version", [(16)])

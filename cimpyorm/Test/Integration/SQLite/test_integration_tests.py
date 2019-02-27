@@ -1,14 +1,24 @@
+import cimpyorm.auxiliary
 from cimpyorm.api import load, parse
 import os
 import pytest
 import cimpyorm
 
-from cimpyorm.backend import SQLite
+from cimpyorm.backends import SQLite, InMemory
+
+
+def test_parse_inmemory(full_grid):
+    try:
+        cimpyorm.auxiliary.get_path("SCHEMAROOT")
+    except KeyError:
+        pytest.skip(f"Schemata not configured")
+    session, m = parse(full_grid, InMemory())
+    session.close()
 
 
 def test_parse_load(full_grid):
     try:
-        cimpyorm.get_path("SCHEMAROOT")
+        cimpyorm.auxiliary.get_path("SCHEMAROOT")
     except KeyError:
         pytest.skip(f"Schemata not configured")
     path = os.path.join(full_grid, ".integration_test.db")
@@ -21,7 +31,7 @@ def test_parse_load(full_grid):
 
 def test_parse_parse(full_grid):
     try:
-        cimpyorm.get_path("SCHEMAROOT")
+        cimpyorm.auxiliary.get_path("SCHEMAROOT")
     except KeyError:
         pytest.skip(f"Schemata not configured")
     path = os.path.join(full_grid, ".integration_test.db")

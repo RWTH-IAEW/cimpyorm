@@ -1,522 +1,13 @@
-#
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
-#
-
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 from typing import Union
 
-import pandas as pd
-from tabulate import tabulate
-from lxml import etree
 from lxml.etree import XPath
-from sqlalchemy import Column, String, ForeignKey, Integer, Float, Boolean, Table
+from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table
 from sqlalchemy.orm import relationship, backref
 
-from cimpyorm import log
-import cimpyorm.Model.auxiliary as aux
-from cimpyorm.Model.Parseable import Parseable
-
-
-__all__ = ["CIMPackage", "CIMClass", "CIMProp", "CIMDTProperty",
-           "CIMDT", "CIMDTUnit", "CIMDTValue", "CIMDTMultiplier",
-           "CIMDTDenominatorUnit", "CIMDTDenominatorMultiplier",
-           "CIMEnum", "CIMEnumValue", "SchemaElement"]
-
-
-class SchemaElement(aux.Base):
-    """
-    ABC for schema entities.
-    """
-    __tablename__ = "SchemaElement"
-    nsmap = None
-    XPathMap = None
-    name = Column(String(80), primary_key=True)
-    label = Column(String(50))
-    namespace = Column(String(30))
-    type_ = Column(String(50))
-    #comment = Column(String(300))
-
-    __mapper_args__ = {
-        "polymorphic_on": type_,
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description=None):
-        """
-        The ABC's constructor
-        :param description: the (merged) xml node element containing the class's description
-        """
-        if description is None:
-            log.error(f"Initialisation of CIM model entity without associated "
-                      f"description invalid.")
-            raise ValueError(f"Initialisation of CIM model entity without "
-                             f"associated description invalid.")
-        self.description = description
-        self.Attributes = self._raw_Attributes()
-        self.name = self._name
-        self.label = self._label
-        self.namespace = self._namespace
-        self.Map = None
-
-    @staticmethod
-    def _raw_Attributes():
-        return {"name": None, "label": None, "namespace": None}
-
-    @classmethod
-    def _generateXPathMap(cls):
-        """
-        Generator for compiled XPath expressions (those require a namespace map to be present, hence they are compiled
-        at runtime)
-        :return: None
-        """
-        cls.XPathMap = {"label": XPath(r"rdfs:label/text()", namespaces=cls.nsmap)}
-        return cls.XPathMap
-
-    @property
-    @aux.prefix_ns
-    def _label(self):
-        """
-        Return the class' label
-        :return: str
-        """
-        return self._raw_property("label")
-
-    @property
-    def _namespace(self) -> Union[str, None]:
-        if not self.Attributes["namespace"]:
-            if not any(self.name.startswith(ns+"_") for ns in self.nsmap.keys()):
-                self.Attributes["namespace"] = "cim"
-            else:
-                self.Attributes["namespace"] = self.name.split("_")[0]
-        return self.Attributes["namespace"]
-
-    @property
-    def _comment(self):
-        """
-        Return the class' label
-        :return: str
-        """
-        # Fixme: This is very slow and not very nice (each string contains the entire xml header - parsing xpath(
-        #  "*/text()) doesn't work due to the text containing xml tags). Therefore, this is currently disabled
-        str_ = "".join(str(etree.tostring(content, pretty_print=True)) for content in self.description.xpath(
-                "rdfs:comment", namespaces=self.nsmap))
-        return str_
-
-    @property
-    @aux.prefix_ns
-    def _name(self) -> Union[str, None]:
-        """
-        Accessor for an entities name (with cache)
-        :return: The entities name as defined in its description
-        """
-        if self.Attributes["name"]:
-            pass
-        else:
-            _n = self.description.values()[0]
-            self.Attributes["name"] = _n
-        self.name = self.Attributes["name"]
-        return self.Attributes["name"]
-
-    def _raw_property(self, property_identifier) -> Union[list, str, None]:
-        """
-        Extract a property from the CIM entity
-        :param property_identifier: property name
-        :return: The CIM entity's property as a list, a string, or None
-        """
-        if self.Attributes[property_identifier] is None:
-            xp = self.XPathMap
-            if property_identifier not in xp.keys():
-                raise KeyError(f"Invalid property_identifier name {property_identifier}.")
-            results = xp[property_identifier](self.description)  # pylint: disable=unsubscriptable-object
-            if len(set(results)) == 1:
-                self.Attributes[property_identifier] = results[0]
-            elif not results:
-                self.Attributes[property_identifier] = None
-            else:
-                log.warning(f"Ambiguous class property_identifier ({property_identifier}) for {self.name}.")
-                self.Attributes[property_identifier] = [result for result in set(results)]
-        return self.Attributes[property_identifier]
-
-    def describe(self, fmt="psql"):
-        print(self)
-
-
-class CIMEnum(SchemaElement):
-    __tablename__ = "CIMEnum"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description):
-        """
-        Class constructor
-        :param description: the (merged) xml node element containing the enums's description
-        """
-        super().__init__(description)
-        self.Attributes = self._raw_Attributes()
-
-
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"category": None}}
-
-
-    @classmethod
-    def _generateXPathMap(cls):
-        super()._generateXPathMap()
-        Map = {"category": XPath(r"cims:belongsToCategory/@rdf:resource", namespaces=cls.nsmap)}
-        if not cls.XPathMap:
-            cls.XPathMap = Map
-        else:
-            cls.XPathMap = {**cls.XPathMap, **Map}
-
-    @property
-    @aux.prefix_ns
-    def _category(self):
-        """
-        Return the enums' category as determined from the schema
-        :return: str
-        """
-        return self._raw_property("category")
-
-    def describe(self, fmt="psql"):
-        table = defaultdict(list)
-        for value in self.values:
-            table["Value"].append(value.label)
-        df = pd.DataFrame(table)
-        print(tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right"))
-
-
-class CIMEnumValue(SchemaElement):
-    __tablename__ = "CIMEnumValue"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-    enum_name = Column(String(50), ForeignKey(CIMEnum.name))
-    enum = relationship(CIMEnum, foreign_keys=enum_name, backref="values")
-
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description):
-        """
-        Class constructor
-        :param description: the (merged) xml node element containing the enums's description
-        """
-        super().__init__(description)
-        self.Attributes = self._raw_Attributes()
-        self.enum_name = self._enum_name
-
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"type": None}}
-
-    @classmethod
-    def _generateXPathMap(cls):
-        super()._generateXPathMap()
-        Map = {"type": XPath(r"rdf:type/@rdf:resource", namespaces=cls.nsmap)}
-        if not cls.XPathMap:
-            cls.XPathMap = Map
-        else:
-            cls.XPathMap = {**cls.XPathMap, **Map}
-
-    @property
-    @aux.prefix_ns
-    def _enum_name(self):
-        """
-        Return the enums' category as determined from the schema
-        :return: str
-        """
-        return self._raw_property("type")
-
-
-class CIMPackage(SchemaElement):
-    __tablename__ = "CIMPackage"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description):
-        """
-        Class constructor
-        :param description: the (merged) xml node element containing the enums's description
-        """
-        super().__init__(description)
-
-
-class CIMClass(SchemaElement):
-    """
-    Class representing a CIM Model Class
-    """
-    __tablename__ = "CIMClass"
-
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-    package_name = Column(String(50), ForeignKey(CIMPackage.name))
-    package = relationship(CIMPackage, foreign_keys=package_name, backref="classes")
-    parent_name = Column(String(50), ForeignKey("CIMClass.name"))
-    parent = relationship("CIMClass", foreign_keys=parent_name, backref="children", remote_side=[name])
-
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description=None):
-        """
-        Class constructor
-        :param description: the (merged) xml node element containing the class's description
-        """
-        super().__init__(description)
-        self.class_ = None
-        self.Attributes = self._raw_Attributes()
-        self.package_name = self._belongsToCategory if not \
-            isinstance(self._belongsToCategory, list) \
-            else self._belongsToCategory[0] # pylint: disable=unsubscriptable-object
-        self.parent_name = self._parent_name
-        self.props = []
-
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"parent": None,
-                   "category": None,
-                   "namespace": None}
-                }
-
-    @classmethod
-    def _generateXPathMap(cls):
-        """
-        Compile XPath Expressions for later use (better performance than tree.xpath(...))
-        :return: None
-        """
-        super()._generateXPathMap()
-        Map = {
-            "parent": XPath(r"rdfs:subClassOf/@rdf:resource", namespaces=cls.nsmap),
-            "category": XPath(r"cims:belongsToCategory/@rdf:resource", namespaces=cls.nsmap)
-        }
-        if not cls.XPathMap:
-            cls.XPathMap = Map
-        else:
-            cls.XPathMap = {**cls.XPathMap, **Map}
-
-    @property
-    @aux.prefix_ns
-    def _belongsToCategory(self):
-        """
-        Return the class' category as determined from the schema
-        :return: str
-        """
-        return self._raw_property("category")
-
-    @property
-    @aux.prefix_ns
-    def _parent_name(self):
-        """
-        Return the class' parent as determined from the schema
-        :return: str
-        """
-        return self._raw_property("parent")
-
-    def init_type(self, base):
-        """
-        Initialize ORM type using the CIMClass object
-        :return: None
-        """
-        log.debug(f"Initializing class {self.name}.")
-        attrs = OrderedDict()
-        attrs["__tablename__"] = self.name
-        self.Map = dict()
-        if self.parent:
-            attrs["id"] = Column(String(50), ForeignKey(f"{self.parent.name}.id",
-                                                        ondelete="CASCADE"), primary_key=True)
-            log.debug(f"Created id column on {self.name} with FK on {self.parent.name}.")
-            attrs["__mapper_args__"] = {
-                "polymorphic_identity": self.name
-            }
-        else: # Base class
-            attrs["type_"] = Column(String(50))
-            attrs["_source_id"] = Column(Integer, ForeignKey("SourceInfo.id"))
-            attrs["_source"] = relationship("SourceInfo", foreign_keys=attrs["_source_id"])
-            attrs["id"] = Column(String(50), primary_key=True)
-            log.debug(f"Created id column on {self.name} with no inheritance.")
-            attrs["__mapper_args__"] = {
-                "polymorphic_on": attrs["type_"],
-                "polymorphic_identity": self.name}
-
-        attrs["_schema_class"] = self
-
-        if self.parent:
-            self.class_ = type(self.name, (self.parent.class_,), attrs)
-        else: # Base class
-            self.class_ = type(self.name, (Parseable, base,), attrs)
-        log.debug(f"Defined class {self.name}.")
-
-    def generate(self, nsmap):
-        for prop in self.props:
-            prop.generate(nsmap)
-
-    def _generate_map(self):
-        """
-        Generate the parse-map so it finds all properties (even those named after the ancestor in the hierarchy)
-        :return: None
-        """
-        # Make sure the CIM Parent Class is always first in __bases__
-        if self.parent:
-            self.Map = {**self.parent._generate_map(), **self.Map}  # pylint: disable=no-member
-        return self.Map
-
-    @property
-    def prop_keys(self):
-        if self.parent:
-            return self.parent.prop_keys + [prop.key for prop in self.props]
-        else:
-            return [prop.key for prop in self.props]
-
-    @property
-    def all_props(self):
-        _all_props = {}
-        for prop in self.props:
-            if prop.namespace is None or prop.namespace == "cim":
-                _all_props[prop.label] = prop
-            else:
-                _all_props[f"{prop.namespace}_{prop.label}"] = prop
-        if self.parent:
-            return {**self.parent.all_props, **_all_props}
-        else:
-            return _all_props
-
-    def _build_map(self, el, session):
-        if not self.parent:
-            argmap = {}
-        else:
-            argmap = self.parent._build_map(el, session)
-        props = [prop for prop in self.props if prop.used]
-        for prop in props:
-            value = prop.xpath(el)
-            if prop.many_remote and prop.used:
-                _id = [el.attrib.values()[0]]
-                _remote_ids = []
-                if len(set(value)) > 1:
-                    for raw_value in value:
-                        _remote_ids = _remote_ids + [v for v in raw_value.split("#") if len(v)]
-                else:
-                    _remote_ids = [v for v in value[0].split("#") if len(v)]
-                _ids = _id * len(_remote_ids)
-                # Insert tuples in chunks of 400 elements max
-                for chunk in aux.chunks(list(zip(_ids, _remote_ids)), 400):
-                    _ins = prop.association_table.insert(
-                        [{f"{prop.domain.label}_id": _id,
-                          f"{prop.range.label}_id": _remote_id}
-                         for (_id, _remote_id) in chunk])
-                    session.execute(_ins)
-            elif len(value) == 1 or len(set(value)) == 1:
-                value = value[0]
-                if isinstance(prop.range, CIMEnum):
-                    argmap[prop.key] = aux.map_enum(value, self.nsmap)
-                else:
-                    try:
-                        t = prop.mapped_datatype
-                        if t == "Float":
-                            argmap[prop.key] = float(value)
-                        elif t == "Boolean":
-                            argmap[prop.key] = value.lower() == "true"
-                        elif t == "Integer":
-                            argmap[prop.key] = int(value)
-                        elif len([v for v in value.split("#") if v])>1:
-                            log.warning(
-                                f"Ambiguous data values for {self.name}:{prop.key}: {len(set(value))} unique values. "
-                                f"(Skipped)")
-                            # If reference doesn't resolve value is set to None (Validation
-                            # has to catch missing obligatory values)
-                        else:
-                            argmap[prop.key] = value.replace("#", "")
-                    except ValueError:
-                        argmap[prop.key] = value.replace("#", "")
-            elif len(value) > 1:
-                log.warning(f"Ambiguous data values for {self.name}:{prop.key}: {len(set(value))} unique values. "
-                            f"(Skipped)")
-                # If reference doesn't resolve value is set to None (Validation
-                # has to catch missing obligatory values)
-        return argmap
-
-    def describe(self, fmt="psql"):
-        table = defaultdict(list)
-        for key, prop in self.all_props.items():
-            table["Label"].append(key)
-            table["Domain"].append(prop.domain.name)
-            table["Multiplicity"].append(prop.multiplicity)
-            try:
-                table["Datatype"].append(prop.datatype.label)
-            except AttributeError:
-                table["Datatype"].append(f"*{prop.range.label}")
-            try:
-                nominator_unit = prop.datatype.unit.symbol.label
-                if nominator_unit.lower() == "none":
-                    nominator_unit = None
-            except AttributeError:
-                nominator_unit = None
-            try:
-                denominator_unit = prop.datatype.denominator_unit.symbol.label
-                if denominator_unit.lower() == "none":
-                    denominator_unit = None
-            except AttributeError:
-                denominator_unit = None
-            if nominator_unit and denominator_unit:
-                table["Unit"].append(f"{nominator_unit}/{denominator_unit}")
-            elif nominator_unit:
-                table["Unit"].append(f"{nominator_unit}")
-            elif denominator_unit:
-                table["Unit"].append(f"1/{denominator_unit}")
-            else:
-                table["Unit"].append("-")
-
-            try:
-                nominator_mpl = prop.datatype.multiplier.value.label
-                if nominator_mpl.lower() == "none":
-                    nominator_mpl = None
-            except AttributeError:
-                nominator_mpl = None
-            try:
-                denominator_mpl = prop.datatype.denominator_multiplier.value.label
-                if denominator_mpl.lower() == "none":
-                    denominator_mpl = None
-            except AttributeError:
-                denominator_mpl = None
-            if nominator_mpl and denominator_mpl:
-                table["Multiplier"].append(f"{nominator_mpl}/{denominator_mpl}")
-            elif nominator_mpl:
-                table["Multiplier"].append(f"{nominator_mpl}")
-            elif denominator_mpl:
-                table["Multiplier"].append(f"1/{denominator_mpl}")
-            else:
-                table["Multiplier"].append("-")
-            table["Inferred"].append(not prop.used)
-
-        df = pd.DataFrame(table)
-        tab = tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right")
-        c = self
-        inh = {}
-        inh["Hierarchy"] = [c.name]
-        inh["Number of native properties"] = [len(c.props)]
-        while c.parent:
-            inh["Hierarchy"].append(c.parent.name)
-            inh["Number of native properties"].append(len(c.parent.props))
-            c = c.parent
-        [val.reverse() for val in inh.values()]
-        inh = tabulate(pd.DataFrame(inh),
-                       headers="keys", showindex=False, tablefmt=fmt, stralign="right")
-        print(inh + "\n" + tab)
+from cimpyorm.auxiliary import log
+from cimpyorm.Model import auxiliary as aux
+from cimpyorm.Model.Elements import SchemaElement, CIMPackage, CIMClass, CIMEnumValue, CIMEnum, prefix_ns
 
 
 class CIMDT(SchemaElement):
@@ -559,7 +50,7 @@ class CIMDT(SchemaElement):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _stereotype(self):
         """
         Return the enums' category as determined from the schema
@@ -568,7 +59,7 @@ class CIMDT(SchemaElement):
         return self._raw_property("stereotype")
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _category(self):
         """
         Return the enums' category as determined from the schema
@@ -624,7 +115,7 @@ class CIMDTProperty(SchemaElement):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _domain(self):
         """
         Return the class' category as determined from the schema
@@ -633,7 +124,7 @@ class CIMDTProperty(SchemaElement):
         return self._raw_property("domain")
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _multiplicity(self):
         mp = self._raw_property("multiplicity")
         return mp.split("M:")[-1] if not isinstance(mp, list) \
@@ -642,9 +133,9 @@ class CIMDTProperty(SchemaElement):
     @property
     def _many_remote(self):
         if isinstance(self._multiplicity, list):
-            return any([mp.endswith("..n") for mp in self._multiplicity])  # pylint: disable=not-an-iterable
+            return any([mp[-1] in ["2", "n"] for mp in self._multiplicity])  # pylint: disable=not-an-iterable
         else:
-            return self._multiplicity.endswith("..n")
+            return self._multiplicity[-1] in ["2", "n"]
 
 
 class CIMDTUnit(CIMDTProperty):
@@ -682,7 +173,7 @@ class CIMDTUnit(CIMDTProperty):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _symbol(self):
         """
         Return the enums' category as determined from the schema
@@ -726,7 +217,7 @@ class CIMDTValue(CIMDTProperty):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _datatype(self):
         return self._raw_property("datatype")
 
@@ -768,7 +259,7 @@ class CIMDTMultiplier(CIMDTProperty):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _value(self):
         """
         Return the enums' category as determined from the schema
@@ -813,7 +304,7 @@ class CIMDTDenominatorUnit(CIMDTProperty):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _symbol(self):
         """
         Return the enums' category as determined from the schema
@@ -859,7 +350,7 @@ class CIMDTDenominatorMultiplier(CIMDTProperty):
             cls.XPathMap = {**cls.XPathMap, **Map}
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _value(self):
         """
         Return the enums' category as determined from the schema
@@ -872,6 +363,9 @@ class CIMProp(SchemaElement):
     """
     Class representing a CIM Model property
     """
+
+    # pylint: disable=too-many-instance-attributes
+
     __tablename__ = "CIMProp"
     XPathMap = None
 
@@ -890,6 +384,7 @@ class CIMProp(SchemaElement):
     used = Column(Boolean)
     multiplicity = Column(String(10))
     many_remote = Column(Boolean)
+    optional = Column(Boolean)
 
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -912,6 +407,7 @@ class CIMProp(SchemaElement):
         self.used = self._used
         self.multiplicity = self._multiplicity
         self.many_remote = self._many_remote
+        self.optional = self._optional
         self.key = None
         self.var_key = None
         self.xpath = None
@@ -953,12 +449,12 @@ class CIMProp(SchemaElement):
         return bool(self._association) or self._inversePropertyName is None
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _datatype(self):
         return self._raw_property("datatype")
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _multiplicity(self):
         mp = self._raw_property("multiplicity")
         return mp.split("M:")[-1] if not isinstance(mp, list) \
@@ -980,17 +476,17 @@ class CIMProp(SchemaElement):
             return association == "Yes"
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _inversePropertyName(self):
         return self._raw_property("inverseRoleName")
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _range(self):
         return self._raw_property("range")
 
     @property
-    @aux.prefix_ns
+    @prefix_ns
     def _domain(self):
         return self._raw_property("domain")
 
@@ -1007,9 +503,16 @@ class CIMProp(SchemaElement):
     @property
     def _many_remote(self):
         if isinstance(self._multiplicity, list):
-            return any([mp.endswith("..n") for mp in self._multiplicity])  # pylint: disable=not-an-iterable
+            return any([mp[-1] in ["2", "n"] for mp in self._multiplicity])  # pylint: disable=not-an-iterable
         else:
-            return self._multiplicity.endswith("..n")
+            return self._multiplicity[-1] in ["2", "n"]
+
+    @property
+    def _optional(self):
+        if isinstance(self._multiplicity, list):
+            return any([mp.startswith("0") for mp in self._multiplicity])  # pylint: disable=not-an-iterable
+        else:
+            return self._multiplicity.startswith("0")
 
     def generate(self, nsmap):
         attrs = OrderedDict()
@@ -1017,7 +520,7 @@ class CIMProp(SchemaElement):
         if self.used:
             if isinstance(self.range, CIMEnum):
                 var, query_base = self.name_query()
-                attrs[f"{var}_name"] = Column(String(50), ForeignKey(CIMEnumValue.name), name=f"{var}_name")
+                attrs[f"{var}_name"] = Column(String(120), ForeignKey(CIMEnumValue.name), name=f"{var}_name")
                 attrs[var] = relationship(CIMEnumValue,
                                           foreign_keys=attrs[f"{var}_name"])
                 self.key = f"{var}_name"

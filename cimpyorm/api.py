@@ -11,21 +11,25 @@
 
 import os
 from pathlib import Path
-from importlib import reload
 import configparser
 from typing import Union, Tuple
 from argparse import Namespace
 
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
 
-from cimpyorm import common, get_path, log
-import cimpyorm.Model.auxiliary as aux
-from cimpyorm.backend import SQLite, Engine, InMemory
-from cimpyorm.Model import Source
+from cimpyorm.auxiliary import log, get_path
+from cimpyorm.Model.Schema import Schema
+from cimpyorm.backends import SQLite, Engine, InMemory
 
 
-def configure(schemata=None, datasets=None):
+def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = None):
+    """
+    Configure paths to schemata or update the DATASETROOT used for tests.
+
+    :param schemata: Path to a folder containing CIM schema descriptions.
+
+    :param datasets: Path to a folder containing test datasets.
+    """
     config = configparser.ConfigParser()
     config.read(get_path("CONFIGPATH"))
     if schemata:
@@ -49,7 +53,7 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
 
     :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
-    import cimpyorm.Model.Instance as Instance
+    import cimpyorm.Model.Schema as Schema
     from cimpyorm.Model import Source
     if isinstance(path_to_db, Engine):
         _backend = path_to_db
@@ -59,14 +63,13 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
     else:
         raise NotImplementedError(f"Unable to connect to database {path_to_db}")
 
-    engine = _backend.engine
     session = _backend.session
-    reset_model(engine)
+    _backend.reset()
 
     _si = session.query(Source.SourceInfo).first()
     v = _si.cim_version
     log.info(f"CIM Version {v}")
-    schema = Instance.Schema(session)
+    schema = Schema.Schema(session)
     schema.init_model(session)
     model = schema.model
     return session, model
@@ -86,29 +89,23 @@ def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Sessio
     :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
     from cimpyorm import Parser
-    backend.dataset_loc = dataset
+    backend.update_path(dataset)
     # Reset database
     backend.drop()
+    backend.reset()
     # And connect
-    engine = backend.engine
-    reset_model(engine)
-    session = backend.session
+    engine, session = backend.connect()
 
-    # ToDo: Move to Engines
-    if engine.dialect.name == "mysql":
-        log.debug("Deferring foreign key checks in mysql database.")
-        session.execute("SET foreign_key_checks='OFF'")
-    elif engine.dialect.name == "postgresql":
-        session.execute("SET CONSTRAINTS ALL DEFERRED")
-
-    sources = Parser.get_sources(session, dataset, Source.SourceInfo)
+    files = Parser.get_files(dataset)
+    from cimpyorm.Model.Source import SourceInfo
+    sources = frozenset([SourceInfo(file) for file in files])
+    session.add_all(sources)
+    session.commit()
 
     cim_version = Parser.get_cim_version(sources)
-    rdfs_path = aux.find_rdfs_path(cim_version)
-    nsmap = Parser.get_nsmap(sources)
 
-    schema = common.generate_schema(rdfs_path=rdfs_path, session=session)
-    Parser.init_backend(engine, nsmap, schema)
+    schema = Schema(version=cim_version, session=session)
+    backend.generate_tables(schema)
 
     log.info(f"Parsing data.")
     entries = Parser.merge_sources(sources)
@@ -130,29 +127,25 @@ def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Sessio
     return session, model
 
 
-def reset_model(engine):
+def docker_parse() -> None:
     """
-    Reset the table metadata for declarative classes.
-    :param engine: A sqlalchemy db-engine to reset
-    :return: None
-    """
-    import cimpyorm.Model.Elements as Elements
-    import cimpyorm.Model.Instance as Instance
-    import cimpyorm.Model.Source as Source
-    aux.Base = declarative_base(engine)
-    reload(Source)
-    reload(Elements)
-    reload(Instance)
-    Source.SourceInfo.metadata.create_all(engine)
-    Instance.SchemaInfo.metadata.create_all(engine)
-
-
-def docker_parse():
-    """
-    Dummy function for parsing in shared docker tmp directory
-    :return: None
+    Dummy function for parsing in shared docker tmp directory.
     """
     parse(r"/tmp")
+
+
+def describe(element, fmt: str = "psql") -> None:
+    """
+    Give a description of an object.
+
+    :param element: The element to describe.
+
+    :param fmt: Format string for tabulate package.
+    """
+    try:
+        element.describe(fmt)
+    except AttributeError:
+        print(f"Element of type {type(element)} doesn't provide descriptions.")
 
 
 if __name__ == "__main__":

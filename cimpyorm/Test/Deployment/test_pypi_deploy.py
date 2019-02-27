@@ -14,7 +14,7 @@ from pathlib import Path
 import requests
 import toml
 
-from cimpyorm import get_path
+from cimpyorm.auxiliary import get_path
 
 
 def test_pypi_version():

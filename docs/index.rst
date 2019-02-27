@@ -19,19 +19,10 @@ called Common Grid Model Exchange Specification (CGMES).
 
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
    :caption: Contents:
 
    about
    quickstart
    Engines
    Exploring
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

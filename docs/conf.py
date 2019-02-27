@@ -30,7 +30,7 @@ except KeyError:
 if not _rtd:
     import toml
     from pathlib import Path
-    from cimpyorm import get_path
+    from cimpyorm.auxiliary import get_path
 
     _path = Path(get_path("PACKAGEROOT")).parent
     _toml_meta = toml.loads(open(os.path.join(_path, "pyproject.toml")).read())

@@ -64,14 +64,16 @@ pylint:
 integration:MariaDB:
   extends: .integration
   services:
-    - mariadb
+    - name: mariadb
+      alias: localhost
   script:
     - pytest --maxfail=1 cimpyorm/Test/Integration/MariaDB
 
 integration:MySQL:
   extends: .integration
   services:
-    - mysql
+    - name: mysql
+      alias: localhost
   script:
     - pytest --maxfail=1 cimpyorm/Test/Integration/MySQL
 

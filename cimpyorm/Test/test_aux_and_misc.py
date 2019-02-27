@@ -1,4 +1,4 @@
-from cimpyorm.Parser import shorten_namespace
+from cimpyorm.auxiliary import shorten_namespace
 
 
 def test_get_class_names_cim(dummy_nsmap):

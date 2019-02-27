@@ -10,53 +10,18 @@
 #
 """
 cimpyorm creates ORM representations of CIM datasets.
+This module sets up and provides configuration and imports.
 """
 # pylint: disable=ungrouped-imports
-import logging
+
 import os
-import configparser
-from pathlib import Path
 
-
-class CustomFormatter(logging.Formatter):
-    """
-    Elapsed time logging formatter.
-    """
-    def formatTime(self, record, datefmt=None):
-        return f"{round(record.relativeCreated/1000)}." \
-               f"{round(record.relativeCreated%1000)}"
-
-
-log = logging.getLogger("cim_orm")
-if not log.handlers:
-    log.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    log.addHandler(handler)
-    formatter = CustomFormatter(fmt='T+%(asctime)10ss:%(levelname)8s: %(message)s')
-    handler.setFormatter(formatter)
-    log.debug("Logger configured.")
-
-CONFIG = configparser.ConfigParser()
-# Set default paths
-CONFIG["Paths"] = {"PACKAGEROOT": Path(os.path.abspath(__file__)).parent,
-                   "TESTROOT": os.path.join(Path(os.path.abspath(__file__)).parent, "Test"),
-                   "CONFIGPATH": os.path.join(Path(os.path.abspath(__file__)).parent, "config.ini")}
-
-_TESTROOT = CONFIG["Paths"]["TESTROOT"]
-_PACKAGEROOT = CONFIG["Paths"]["PACKAGEROOT"]
-_CONFIGPATH = CONFIG["Paths"]["CONFIGPATH"]
+from cimpyorm.auxiliary import log, get_path, _CONFIGPATH, CONFIG, _TESTROOT, _PACKAGEROOT
 
 if not os.path.isfile(_CONFIGPATH):
     with open(_CONFIGPATH, "w+") as f:
         # Update config.ini
         CONFIG.write(f)
-
-
-def get_path(identifier):
-    config = configparser.ConfigParser()
-    config.read(_CONFIGPATH)
-    return config["Paths"][identifier]
-
 
 try:
     import pytest
@@ -114,6 +79,7 @@ def describe(element, fmt="psql"):
 
 
 try:
-    from cimpyorm.api import parse, load  # pylint: disable=wrong-import-position
+    from cimpyorm.api import parse, load, describe  # pylint: disable=wrong-import-position
+    from cimpyorm.Model.Schema import Schema  # pylint: disable=wrong-import-position
 except ModuleNotFoundError:
     log.warning(f"Unfulfilled requirements. parse and load are not available.")

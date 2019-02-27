@@ -1,13 +1,21 @@
 import os
+from importlib import reload
+from abc import ABC
 
 import sqlalchemy as sa
+from sqlalchemy.engine import Engine as SA_Engine
+from sqlalchemy.orm.session import Session as SA_Session
 from sqlalchemy.exc import OperationalError, InternalError
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from networkx import bfs_tree
 
-from cimpyorm import log
+# pylint: disable=too-many-arguments
+import cimpyorm.Model.auxiliary as aux
+from cimpyorm.auxiliary import log
 
 
-class Engine:
+class Engine(ABC):
     def __init__(self, dialect=None, echo=False, driver=None, path=None):
         self.dialect = dialect
         self.echo = echo
@@ -16,10 +24,12 @@ class Engine:
         self._engine = None
 
     @property
-    def engine(self):
+    def engine(self) -> SA_Engine:
         """
         :param echo:
+
         :param database:
+
         :return:
         """
         if not self._engine:
@@ -29,9 +39,16 @@ class Engine:
         return self._engine
 
     @property
-    def session(self):
-        session = sessionmaker(bind=self.engine)
-        return session()
+    def session(self) -> SA_Session:
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        return session
+
+    def connect(self):
+        return self.engine, self.session
+
+    def update_path(self, path):
+        pass
 
     def _prefix(self):
         if self.driver:
@@ -45,13 +62,54 @@ class Engine:
     def drop(self):
         raise NotImplementedError
 
+    def reset(self) -> None:
+        """
+        Reset the table metadata for declarative classes.
+
+        :param engine: A sqlalchemy db-engine to reset
+
+        :return: None
+        """
+        import cimpyorm.Model.Elements as Elements
+        import cimpyorm.Model.Schema as Schema
+        import cimpyorm.Model.Source as Source
+        aux.Base = declarative_base(self.engine)
+        reload(Source)
+        reload(Elements)
+        reload(Schema)
+        Source.SourceInfo.metadata.create_all(self.engine)
+        Elements.SchemaElement.metadata.create_all(self.engine)
+        Schema.SchemaInfo.metadata.create_all(self.engine)
+
+    def generate_tables(self, schema):
+        g = schema.inheritance_graph
+        hierarchy = list(bfs_tree(g, "__root__"))
+        hierarchy.remove("__root__")
+        log.info(f"Creating map prefixes.")
+        for c in hierarchy:
+            c.class_.compile_map(c.nsmap)
+        # ToDo: create_all is quite slow, maybe this can be sped up. Currently low priority.
+        log.info(f"Creating table metadata.")
+        for child in g["__root__"]:
+            child.class_.metadata.create_all(self.engine)
+        log.info(f"Backend model ready.")
+
 
 class SQLite(Engine):
     def __init__(self, path="out.db", echo=False, driver=None, dataset_loc=None):
+        """
+        Default constructor for SQLite backend instance
+
+        :param path: Storage location for the .db-file (default: "out.db" in cwd)
+
+        :param echo: SQLAlchemy "echo" parameter (default: False)
+
+        :param driver: Python SQLite driver (default: sqlite3)
+
+        :param dataset_loc: Dataset location used to automatically determine storage location (in the dataset folder)
+        """
         self.dialect = "sqlite"
-        self.dataset = dataset_loc
         super().__init__(self.dialect, echo, driver, path)
-        self._update_path()
 
     def drop(self):
         try:
@@ -63,22 +121,20 @@ class SQLite(Engine):
 
     @property
     def engine(self):
-        if not self._engine:
-            self._update_path()
         return super().engine
 
-    def _update_path(self):
-        if self.dataset is None:
+    def update_path(self, path):
+        if path is None:
             out_dir = os.getcwd()
-        elif isinstance(self.dataset, list):
+        elif isinstance(path, list):
             try:
-                out_dir = os.path.commonpath([os.path.abspath(path) for path in self.dataset])
+                out_dir = os.path.commonpath([os.path.abspath(path) for path in path])
             except ValueError:
                 # Paths are on different drives - default to cwd.
                 log.warning(f"Datasources have no common root. Database file will be saved to {os.getcwd()}")
                 out_dir = os.getcwd()
         else:
-            out_dir = os.path.abspath(self.dataset)
+            out_dir = os.path.abspath(path)
         if not os.path.isabs(self.path):
             if os.path.isdir(out_dir):
                 db_path = os.path.join(out_dir, self.path)
@@ -95,7 +151,22 @@ class SQLite(Engine):
                                 echo=self.echo, connect_args={"check_same_thread": False})
 
 
-class InMemory(SQLite):
+class InMemory(Engine):
+    def __init__(self, echo=False, driver=None):
+        """
+        Default constructor for In-Memory-SQLite instances
+
+        :param echo: SQLAlchemy "echo" parameter (default: False)
+
+        :param driver: Python SQLite driver (default: sqlite3)
+        """
+        self.dialect = "sqlite"
+        super().__init__(self.dialect, echo, driver)
+
+    def drop(self):
+        log.info(f"Removed old database {self.path}.")
+        self._engine = None
+
     def _connect_engine(self):
         # ToDo: Disabling same_thread check is only treating the symptoms, however, without it, property changes
         #       can't be committed
@@ -151,42 +222,64 @@ class ClientServer(Engine):
 
 
 class MariaDB(ClientServer):
-    """
-    MariaDB backend
-    """
-    def __init__(self, username="root", password="", driver=None,
+    def __init__(self, username="root", password="", driver="pymysql",
                  host="127.0.0.1", port=3306, path="cim", echo=False):
         """
         Default constructor for MariaDB backend instance
+
         :param username: Username for the MariaDB database (default: root)
-        :param password: Password for username@MariaDB database (default: "")
+
+        :param password: Password for username (at) MariaDB database (default: "")
+
         :param driver: Python MariaDB driver (default: mysqlclient)
+
         :param host: Database host (default: localhost)
+
         :param port: Database port (default: 3306)
+
         :param path: Database name (default: "cim")
+
         :param echo: SQLAlchemy "echo" parameter (default: False)
         """
         super().__init__(username, password, driver, host,
                          port, path, echo)
         self.dialect = "mysql"
 
+    @property
+    def session(self):
+        session = super().session
+        log.debug("Deferring foreign key checks in mysql database.")
+        session.execute("SET foreign_key_checks='OFF'")
+        return session
+
 
 class MySQL(ClientServer):
-    """
-    MySQL backend
-    """
     def __init__(self, username="root", password="", driver="pymysql",
                  host="127.0.0.1", port=3306, path="cim", echo=False):
         """
         Default constructor for MySQL backend instance
+
         :param username: Username for the MySQL database (default: root)
-        :param password: Password for username@MySQL database (default: "")
+
+        :param password: Password for username (at) MySQL database (default: "")
+
         :param driver: Python MariaDB driver (default: pymysql)
+
         :param host: Database host (default: localhost)
+
         :param port: Database port (default: 3306)
+
         :param path: Database name (default: "cim")
+
         :param echo: SQLAlchemy "echo" parameter (default: False)
         """
         super().__init__(username, password, driver, host,
                          port, path, echo)
         self.dialect = "mysql"
+
+    @property
+    def session(self):
+        session = super().session
+        log.debug("Deferring foreign key checks in mysql database.")
+        session.execute("SET foreign_key_checks='OFF'")
+        return session

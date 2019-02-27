@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cimpyorm"
-version = "0.4.4"
+version = "0.4.5"
 description = "A database-backed ORM for CIM datasets."
 authors = ["Thomas Offergeld <offergeld@ifht.rwth-aachen.de>"]
 homepage = "http://www.ifht.rwth-aachen.de"
@@ -29,14 +29,13 @@ lxml = "^4.2"
 pytest = "^4.0"
 pandas = "^0.24.1"
 tabulate = "^0.8.3"
-sphinx-autodoc-typehints = "^1.6"
+tqdm = "^4.31"
 
 [tool.poetry.dev-dependencies]
 pytest-cov = "^2.6"
 pylint = "^2.2"
 wheel = "^0.32.3"
 vulture = "^1.0"
-mysqlclient = "^1.4"
 pymysql = "^0.9.3"
 sphinx = "^1.8"
 sphinx_rtd_theme = "^0.4.3"

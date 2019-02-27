@@ -19,7 +19,7 @@ from functools import lru_cache
 import lxml.etree as et
 from sqlalchemy import Column, Integer, String, TEXT
 
-from cimpyorm import log
+from cimpyorm.auxiliary import HDict
 import cimpyorm.Model.auxiliary as aux
 
 
@@ -34,13 +34,12 @@ class SourceInfo(aux.Base):
     FullModel = Column(TEXT)
     namespaces = Column(TEXT)
 
-    def __init__(self, source_file, source_id):
+    def __init__(self, source_file):
         """
         Initialize DataSource object
         :param source_file: Path to the file containing the model data
         """
         self.source = source_file
-        self.id = source_id
         self._parse_meta()
 
     def __repr__(self):
@@ -59,7 +58,7 @@ class SourceInfo(aux.Base):
         Return the source's cim_version
         :return: str - The source's cim version
         """
-        nsmap = json.loads(self.namespaces)
+        nsmap = HDict(json.loads(self.namespaces))
         return _get_cimrdf_version(nsmap["cim"])
 
     @property
@@ -69,7 +68,7 @@ class SourceInfo(aux.Base):
         Return the source's nsmap
         :return: dict - The source's nsmap
         """
-        nsmap = json.loads(self.namespaces)
+        nsmap = HDict(json.loads(self.namespaces))
         return nsmap
 
     def _parse_meta(self):

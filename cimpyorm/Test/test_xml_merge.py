@@ -1,11 +1,8 @@
 import pytest
-import logging
 import lxml.etree as et
 import os
 
-import cimpyorm.common
-from cimpyorm.common import parseable_files
-from cimpyorm import get_path
+from cimpyorm.auxiliary import log, get_path, parseable_files, merge
 
 schemata = []
 datasets = []
@@ -26,7 +23,6 @@ except KeyError:
     pass
 
 tested_directories = schemata + datasets
-log = logging.getLogger("cim_orm")
 
 
 @pytest.mark.parametrize("path", tested_directories)
@@ -42,7 +38,7 @@ def test_count_merged_elements(path):
     elements = 0
     for xmlfile in files:
         elements += len(et.parse(xmlfile).getroot())
-    tree = cimpyorm.common.merge(path)
+    tree = merge(path)
     assert len(tree.getroot()) == elements
 
 
@@ -55,7 +51,7 @@ def test_count_properties(path):
     for xmlfile in files:
         for node in et.parse(xmlfile).getroot():
             properties_unmerged += len(node)
-    tree = cimpyorm.common.merge(path)
+    tree = merge(path)
     properties_merged = sum(len(node) for node in tree.getroot())
     assert properties_merged == properties_unmerged
 
@@ -66,7 +62,7 @@ def test_merged_nsmaps(path):
     for file in parseable_files(path):
         for key, value in et.parse(file).getroot().nsmap.items():
             expected[key] = value
-    tree = cimpyorm.common.merge(path)
+    tree = merge(path)
     log.info(f"{len(expected.keys())} entries expected in nsmap. {len(tree.getroot().nsmap.keys())} found")
     log.debug(f"Expected: {expected.keys()}")
     log.debug(f"Found: {tree.getroot().nsmap.keys()}")

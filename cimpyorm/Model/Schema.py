@@ -15,50 +15,67 @@ from collections import defaultdict
 
 import lxml.etree as et
 from lxml.etree import XPath
+import networkx as nx
 from networkx import DiGraph, bfs_tree
+from networkx.exception import NetworkXNoPath
 from sqlalchemy import Column, TEXT, Integer
 from sqlalchemy.exc import InvalidRequestError
 
-from cimpyorm import log
+from cimpyorm.auxiliary import log, merge, HDict, merge_descriptions, find_rdfs_path
 import cimpyorm.Model.auxiliary as aux
 from cimpyorm.Model.Elements import CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, \
-            CIMDTUnit, CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, SchemaElement, CIMDTProperty, \
-            CIMDTDenominatorMultiplier
+    CIMDTUnit, CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, SchemaElement, CIMDTProperty, \
+    CIMDTDenominatorMultiplier
+from cimpyorm.backends import InMemory
 
 
 class Schema:
-    def __init__(self, session, file_or_tree=None):
+    def __init__(self, session=None, version: str = "16"):
         """
         Initialize a Backend object, containing information about the schema elements
         :param file_or_tree: The schema file or a parsed root
         """
-        if not file_or_tree:
+        self.g = None
+        if not session:
+            backend = InMemory()
+            backend.reset()
+            session = backend.session
+        rdfs_path = find_rdfs_path(version)
+        if not rdfs_path:
+            raise FileNotFoundError("Failed to find schema file. Please provide one.")
+        tree = merge(rdfs_path)
+        log.info(f"Dynamic code generation.")
+        if session.query(SchemaElement).count():
+            # A schema is already present, so just load it instead of recreating
             self.session = session
-            self._Element_classes = {c.__name__: c for c in
-                                     [CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, CIMDTUnit,
-                                      CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, CIMDTDenominatorMultiplier]}
+            self.Element_classes = {c.__name__: c for c in
+                                    [CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, CIMDTUnit,
+                                     CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, CIMDTDenominatorMultiplier]}
             self.Elements = {c.__name__: {cim_class.name: cim_class for cim_class in session.query(c).all()}
-                             for c in self._Element_classes.values()}
+                             for c in self.Element_classes.values()}
         else:
             self.session = session
-            if isinstance(file_or_tree, type(et.ElementTree())):
+            if isinstance(tree, type(et.ElementTree())):
                 self.file = None
-                self.root = file_or_tree.getroot()
+                self.root = tree.getroot()
             else:
-                self.file = file_or_tree
-                self.root = et.parse(file_or_tree).getroot()
-            self._Element_classes = {c.__name__: c for c in
-                                     [CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, CIMDTUnit,
-                                      CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, CIMDTDenominatorMultiplier]}
-            self.Elements = {c.__name__: defaultdict(list) for c in self._Element_classes.values()}
+                self.file = tree
+                self.root = et.parse(tree).getroot()
+            self.Element_classes = {c.__name__: c for c in
+                                    [CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, CIMDTUnit,
+                                     CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, CIMDTDenominatorMultiplier]}
+            self.Elements = {c.__name__: defaultdict(list) for c in self.Element_classes.values()}
             self._init_parser()
             self._generate()
             for _, Cat_Elements in self.Elements.items():
                 self.session.add_all(list(Cat_Elements.values()))
                 self.session.commit()
             log.debug(f"Backend generated")
+            session.add(SchemaInfo(self.root.nsmap))
+            self.init_model(session)
 
-    def create_inheritance_graph(self):
+    @property
+    def inheritance_graph(self):
         """
         Determine the class inheritance hierarchy (class definition needs to adhere to strict inheritance hierarchy)
         :param classes: dict of CIMClass objects
@@ -80,8 +97,8 @@ class Schema:
         return g
 
     def _init_parser(self):
-        SchemaElement.nsmap = self.root.nsmap
-        for c in self._Element_classes.values():
+        SchemaElement.nsmap = HDict(self.root.nsmap)
+        for c in self.Element_classes.values():
             c._generateXPathMap()
 
     @staticmethod
@@ -180,16 +197,51 @@ class Schema:
             if value:
                 log.debug(f"Generated {len(value)} {key}.")
 
+    @property
+    def map(self):
+        if not self.g:
+            g = DiGraph()
+            classes = self.session.query(CIMClass).all()
+            enums = self.session.query(CIMEnum).all()
+            g.add_nodes_from(classes)
+            g.add_nodes_from(enums)
+            g.add_nodes_from(self.session.query(CIMProp).all())
+
+            for node in classes + enums:
+                try:
+                    for prop in node.all_props.values():
+                        if prop.range:
+                            g.add_edge(node, prop.range, label=prop.label)
+                        else:
+                            g.add_edge(node, prop, label=prop.label)
+                except AttributeError:
+                    pass
+            self.g = g
+        return self.g
+
+    def path(self, source, destination):
+        if source == destination:
+            return
+        try:
+            path = nx.shortest_path(self.map, source, destination)
+        except NetworkXNoPath:
+            log.error(f"No path between {source.name} and {destination.name}.")
+            return
+        way = []
+        for iter in range(1, len(path)):
+            way.append(self.map.edges[path[iter-1], path[iter]]["label"])
+        return way
+
     def _merge_elements(self):
         for Category, CatElements in self.Elements.items():
             log.debug(f"Merging {Category}.")
             for NodeName, NodeElements in CatElements.items():
-                CatElements[NodeName] = self._Element_classes[Category](
-                    aux.merge_descriptions([e.description for e in NodeElements]))
+                CatElements[NodeName] = self.Element_classes[Category](
+                    merge_descriptions([e.description for e in NodeElements]))
             self.Elements[Category] = dict(CatElements)
 
     def init_model(self, session):
-        g = self.create_inheritance_graph()
+        g = self.inheritance_graph
 
         additionalNodes = list(bfs_tree(g, "__root__"))
         additionalNodes.remove("__root__")

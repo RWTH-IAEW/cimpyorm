@@ -26,7 +26,9 @@ extension-pkg-whitelist=lxml
 disable=logging-fstring-interpolation,
     invalid-name,
     too-few-public-methods, # With declarative we have many classes with no/few methods
-    #no-else-return
+    no-else-return,
+    duplicate-code # There are many false positives with the declarative Elements classes - can't really refactor those
+                   # duplicate-code can't be disabled on file or module level
 
 [REPORTS]
 
@@ -273,7 +275,7 @@ max-locals=15
 max-returns=6
 
 # Maximum number of branch for function / method body
-max-branches=12
+max-branches=20
 
 # Maximum number of statements in function / method body
 max-statements=50

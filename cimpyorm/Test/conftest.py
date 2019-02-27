@@ -1,11 +1,9 @@
 import pytest
 import os
-import logging
 
 # Keep import for _CONFIGPATH - otherwise get_path fails because cimpyorm/__init__.py locals aren't present
 
-from cimpyorm import get_path
-logging.disable(logging.CRITICAL)
+from cimpyorm.auxiliary import log, get_path
 
 
 @pytest.fixture(scope="session")
@@ -22,8 +20,8 @@ def full_grid():
 
 @pytest.fixture(scope="module")
 def acquire_db():
-    import cimpyorm.backend
-    backend = cimpyorm.backend.SQLite()
+    import cimpyorm.backends
+    backend = cimpyorm.backends.SQLite()
     engine = backend.engine
     session = backend.session
     return engine, session
@@ -43,7 +41,6 @@ def load_test_db():
     return session, m
 
 
-
 @pytest.fixture(scope="session")
 def dummy_source():
     try:
@@ -53,15 +50,22 @@ def dummy_source():
     if not os.path.isfile(path):
         pytest.skip("Dataset 'FullGrid' not present.")
     from cimpyorm.Model.Source import SourceInfo
-    ds = SourceInfo(source_file=path, source_id=1)
+    ds = SourceInfo(source_file=path)
     return ds
 
 
 @pytest.fixture(scope="session")
 def dummy_nsmap():
-    from cimpyorm.Model.auxiliary import HDict
+    from cimpyorm.auxiliary import HDict
     nsmap = HDict({'cim': 'http://iec.ch/TC57/2013/CIM-schema-cim16#',
                    'entsoe': 'http://entsoe.eu/CIM/SchemaExtension/3/1#',
                    'md': 'http://iec.ch/TC57/61970-552/ModelDescription/1#',
                    'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'})
     return nsmap
+
+
+@pytest.fixture(scope="session")
+def cgmes_schema():
+    from cimpyorm.Model.Schema import Schema
+    schema = Schema(version="16")
+    return schema

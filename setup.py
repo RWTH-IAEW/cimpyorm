@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.4.5',  # Required
+    version='0.4.6',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional

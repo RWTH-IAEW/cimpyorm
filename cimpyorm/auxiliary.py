@@ -17,8 +17,6 @@ import logging
 from zipfile import ZipFile
 from itertools import chain
 
-from lxml import etree as et
-
 
 class HDict(dict):
     """Provide a hashable dict for use as cache key"""
@@ -83,6 +81,7 @@ def merge(source_path):
 
     :return: Merged Elementtree
     """
+    from lxml import etree as et
     path = source_path
     files = parseable_files(path)
     base = et.parse(files[0])

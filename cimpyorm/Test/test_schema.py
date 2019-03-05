@@ -11,4 +11,16 @@ def test_persisted_classes(cgmes_schema):
 
 def test_summary(cgmes_schema):
     schema = cgmes_schema
-    assert schema.model.classes.ACLineSegment.build_summary().shape == (27, 8)
+    assert schema.model.classes.ACLineSegment.property_table().shape == (27, 8)
+
+
+def test_description_CIMClass(cgmes_schema):
+    from cimpyorm import describe
+    describe(cgmes_schema.model.classes.TopologicalNode)
+    cgmes_schema.model.classes.TopologicalNode.describe()
+
+
+def test_description_parseable(cgmes_schema):
+    from cimpyorm import describe
+    describe(cgmes_schema.model.TopologicalNode)
+    cgmes_schema.model.TopologicalNode.describe()

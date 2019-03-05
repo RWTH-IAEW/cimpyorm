@@ -207,8 +207,12 @@ class CIMClass(SchemaElement):
                 # has to catch missing obligatory values)
         return argmap, insertables
 
+    def to_html(self, **kwargs):
+        df = self.property_table()
+        return df.to_html(**kwargs)
+
     def describe(self, fmt="psql"):
-        df = self.build_summary()
+        df = self.property_table()
         tab = tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right")
         c = self
         inh = dict()
@@ -224,7 +228,7 @@ class CIMClass(SchemaElement):
                        headers="keys", showindex=False, tablefmt=fmt, stralign="right")
         print(inh + "\n" + tab)
 
-    def build_summary(self):
+    def property_table(self):
         table = defaultdict(list)
         for key, prop in self.all_props.items():
             table["Label"].append(key)

@@ -48,3 +48,7 @@ class Parseable:
     @classmethod
     def describe(cls, fmt="psql"):
         cls._schema_class.describe(fmt)
+
+    @classmethod
+    def to_html(cls, **kwargs):
+        return cls._schema_class.to_html(**kwargs)

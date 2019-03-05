@@ -7,3 +7,4 @@
 *.egg-info/
 /cimpyorm/config.ini
 /docs/_build/
+/.venv/

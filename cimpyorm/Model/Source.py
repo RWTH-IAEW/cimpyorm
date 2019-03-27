@@ -51,7 +51,6 @@ class SourceInfo(aux.Base):
         str_ = f"source uuid: {self.uuid} | filename: {self.filename} | profiles: {fm['profile']}"
         return str_
 
-
     @property
     def cim_version(self):
         """
@@ -92,11 +91,15 @@ class SourceInfo(aux.Base):
         tree = self.tree
         nsmap = tree.getroot().nsmap
         source = tree.xpath("md:FullModel", namespaces=nsmap)[0]
-        uuid = source.xpath("@rdf:about", namespaces=nsmap)[0].split("urn:uuid:")[-1]
+        full_model_id = set(source.xpath("@rdf:about", namespaces=nsmap)) | set(
+            source.xpath("@rdf:ID", namespaces=nsmap))
+        assert len(full_model_id) == 1
+        uuid = list(full_model_id)[0].split("urn:uuid:")[-1]
         metadata = defaultdict(list)
         for element in source:
             entry = element.tag.split("Model.")[-1]
-            value = element.text if entry != "DependentOn" else element.attrib.values()[0].split("urn:uuid:")[-1]
+            value = element.text if entry != "DependentOn" else \
+            element.attrib.values()[0].split("urn:uuid:")[-1]
             if value not in metadata[entry]:
                 metadata[entry].append(value)
         return uuid, metadata

@@ -16,10 +16,17 @@ from typing import Union, Tuple
 from argparse import Namespace
 
 from sqlalchemy.orm.session import Session
+from pandas import DataFrame
+import click
 
 from cimpyorm.auxiliary import log, get_path
 from cimpyorm.Model.Schema import Schema
 from cimpyorm.backends import SQLite, Engine, InMemory
+
+
+@click.group()
+def cli():
+    pass
 
 
 def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = None):
@@ -40,6 +47,8 @@ def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = No
         config.write(configfile)
 
 
+@cli.command()
+@click.argument("path_to_db", type=click.Path(exists=True))
 def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, Namespace]:
     """
     Load an already parsed database from disk or connect to a server and yield a database session to start querying on
@@ -75,6 +84,8 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
     return session, model
 
 
+@cli.command()
+@click.argument("dataset", type=click.Path(exists=True))
 def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Session, Namespace]:
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
@@ -127,6 +138,24 @@ def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Sessio
     return session, model
 
 
+def stats(session):
+    from cimpyorm.Model.Elements import CIMClass
+    from collections import Counter
+    stats = {}
+    objects = Counter()
+    for base_class in session.query(CIMClass).filter(CIMClass.parent==None).all():
+        objects |= Counter([el.type_ for el in session.query(base_class.class_).all()])
+    for cimclass in session.query(CIMClass).all():
+        cnt = session.query(cimclass.class_).count()
+        if cnt > 0:
+            if cimclass.name in objects:
+                stats[cimclass.name] = (cnt, objects[cimclass.name])
+            else:
+                stats[cimclass.name] = (cnt, 0)
+    return DataFrame(stats.values(), columns=["polymorphic_instances", "objects"],
+                     index=stats.keys()).sort_values("objects", ascending=False)
+
+
 def docker_parse() -> None:
     """
     Dummy function for parsing in shared docker tmp directory.
@@ -149,10 +178,11 @@ def describe(element, fmt: str = "psql") -> None:
 
 
 if __name__ == "__main__":
-    root = get_path("DATASETROOT")
-    # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
-    #                        os.path.isdir(os.path.join(root, folder)) or
-    #                        os.path.join(root, folder).endswith(".zip")])
-    db_session, m = parse(os.path.join(get_path("DATASETROOT"), "FullGrid"), InMemory())
-    print(db_session.query(m.IdentifiedObject).first().name)  # pylint: disable=no-member
-    db_session.close()
+    parse()
+    # root = get_path("DATASETROOT")
+    # # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
+    # #                        os.path.isdir(os.path.join(root, folder)) or
+    # #                        os.path.join(root, folder).endswith(".zip")])
+    # db_session, m = parse(os.path.join(get_path("DATASETROOT"), "FullGrid"), InMemory())
+    # print(db_session.query(m.IdentifiedObject).first().name)  # pylint: disable=no-member
+    # db_session.close()

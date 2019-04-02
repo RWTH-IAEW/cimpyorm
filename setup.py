@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.4.7',  # Required
+    version='0.5.0',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
@@ -54,6 +54,7 @@ setup(
     ]),  # Required
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'Click',
         'sqlalchemy (>=1.2,<2.0)',
         'networkx (>=2.2,<3.0)',
         'numpy (>=1.15,<2.0)',
@@ -70,4 +71,8 @@ setup(
     project_urls={  # Optional
         'homepage': 'http://www.ifht.rwth-aachen.de',
     },
+    entry_points='''
+    [console_scripts]
+    cimpyorm=cimpyorm.api:cli
+    '''
 )

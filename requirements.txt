@@ -1,10 +1,9 @@
 sqlalchemy
 networkx
 numpy
-pytest
-pytest-cov
 lxml
 pylint
 pandas
 tabulate
 tqdm
+click

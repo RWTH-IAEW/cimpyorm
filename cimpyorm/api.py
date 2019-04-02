@@ -17,16 +17,10 @@ from argparse import Namespace
 
 from sqlalchemy.orm.session import Session
 from pandas import DataFrame
-import click
 
 from cimpyorm.auxiliary import log, get_path
 from cimpyorm.Model.Schema import Schema
 from cimpyorm.backends import SQLite, Engine, InMemory
-
-
-@click.group()
-def cli():
-    pass
 
 
 def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = None):
@@ -47,8 +41,6 @@ def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = No
         config.write(configfile)
 
 
-@cli.command()
-@click.argument("path_to_db", type=click.Path(exists=True))
 def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, Namespace]:
     """
     Load an already parsed database from disk or connect to a server and yield a database session to start querying on
@@ -84,8 +76,6 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
     return session, model
 
 
-@cli.command()
-@click.argument("dataset", type=click.Path(exists=True))
 def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Session, Namespace]:
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
@@ -178,7 +168,7 @@ def describe(element, fmt: str = "psql") -> None:
 
 
 if __name__ == "__main__":
-    parse()
+    pass
     # root = get_path("DATASETROOT")
     # # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
     # #                        os.path.isdir(os.path.join(root, folder)) or

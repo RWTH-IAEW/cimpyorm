@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.5.0',  # Required
+    version='0.5.1',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
@@ -73,6 +73,6 @@ setup(
     },
     entry_points='''
     [console_scripts]
-    cimpyorm=cimpyorm.api:cli
+    cimpyorm=cimpyorm.cli:cli
     '''
 )

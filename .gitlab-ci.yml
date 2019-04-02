@@ -110,7 +110,8 @@ build_dist:
   extends: .deploy_common
   stage: deploy:build
   script:
-    - python setup.py sdist bdist_wheel
+    - pip install poetry
+    - poetry build
   artifacts:
     when: on_success
     expire_in: 1 week

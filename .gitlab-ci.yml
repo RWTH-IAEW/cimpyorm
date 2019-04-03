@@ -135,7 +135,7 @@ cli:
   only:
     - Releases
   tags:
-    - linux
+    - docker
   stage: deploy:check
   script:
     - pip install dist/*.whl

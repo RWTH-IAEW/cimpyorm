@@ -39,7 +39,8 @@ def load(path_to_db, echo=False):
 
 @cli.command()
 @click.argument("dataset", type=click.Path(exists=True))
-def parse(dataset):
+@click.option("--silence_tqdm/--no-silence_tqdm", "silence_tqdm", default=False)
+def parse(dataset, silence_tqdm):
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
     in the model namespace.
@@ -49,6 +50,7 @@ def parse(dataset):
 
     :param dataset: Path to the cim snapshot.
     :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
+    :param silence_tqdm: Silence tqdm progress bars
     """
 
-    cimpyorm.parse(dataset, SQLite())
+    cimpyorm.parse(dataset, SQLite(), silence_tqdm)

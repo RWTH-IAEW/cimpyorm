@@ -131,6 +131,18 @@ check:
   dependencies:
     - build_dist
 
+cli:
+  only:
+    - Releases
+  tags:
+    - linux
+  stage: deploy:check
+  script:
+    - pip install dist/*.whl
+    - cimpyorm parse --silence_tqdm /cimpyorm/res/datasets/FullGrid
+  dependencies:
+    - build_dist
+
 upload:
   extends: .deploy_common
   stage: deploy:upload

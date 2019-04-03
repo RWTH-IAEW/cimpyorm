@@ -76,7 +76,9 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
     return session, model
 
 
-def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Session, Namespace]:
+def parse(dataset: Union[str, Path],
+          backend: Engine = SQLite(),
+          silence_tqdm: bool = False) -> Tuple[Session, Namespace]:
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
     in the model namespace.
@@ -86,6 +88,7 @@ def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Sessio
 
     :param dataset: Path to the cim snapshot.
     :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
+    :param silence_tqdm: Silence tqdm progress bars
 
     :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
@@ -110,7 +113,7 @@ def parse(dataset: Union[str, Path], backend: Engine = SQLite()) -> Tuple[Sessio
 
     log.info(f"Parsing data.")
     entries = Parser.merge_sources(sources)
-    elements = Parser.parse_entries(entries, schema)
+    elements = Parser.parse_entries(entries, schema, silence_tqdm=silence_tqdm)
     log.info(f"Passing {len(elements):,} objects to database.")
     session.bulk_save_objects(elements)
     session.flush()

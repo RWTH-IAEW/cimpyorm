@@ -47,7 +47,7 @@ def merge_sources(sources):
     return d_
 
 
-def parse_entries(entries, schema):
+def parse_entries(entries, schema, silence_tqdm=False):
     classes = dict(schema.session.query(
         schema.Element_classes["CIMClass"].name,
         schema.Element_classes["CIMClass"]
@@ -55,7 +55,8 @@ def parse_entries(entries, schema):
     created = []
     for classname, elements in entries.items():
         if classname in classes.keys():
-            for uuid, element in tqdm(elements.items(), desc=f"Reading {classname}", leave=False):
+            for uuid, element in tqdm(elements.items(), desc=f"Reading {classname}", leave=False,
+                                      disable=silence_tqdm):
                 argmap, insertables = classes[classname].parse_values(element, schema.session)
                 created.append(classes[classname].class_(id="_"+uuid,
                                                          **argmap))

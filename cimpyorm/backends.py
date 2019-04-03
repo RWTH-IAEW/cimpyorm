@@ -164,8 +164,7 @@ class InMemory(Engine):
         super().__init__(self.dialect, echo, driver)
 
     def drop(self):
-        log.info(f"Removed old database {self.path}.")
-        self._engine = None
+        pass
 
     def _connect_engine(self):
         # ToDo: Disabling same_thread check is only treating the symptoms, however, without it, property changes

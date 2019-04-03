@@ -8,10 +8,13 @@
 #  CIMPy is licensed under the BSD-3-Clause license.
 #  For further information see LICENSE in the project's root directory.
 #
+import os
+
 import click
+from tabulate import tabulate
 
 import cimpyorm
-from cimpyorm.backends import SQLite
+from cimpyorm.backends import SQLite, InMemory
 
 
 @click.group()
@@ -54,3 +57,20 @@ def parse(dataset, silence_tqdm):
     """
 
     cimpyorm.parse(dataset, SQLite(), silence_tqdm)
+
+
+@cli.command()
+@click.argument("dataset", type=click.Path(exists=True))
+@click.option("--silence_tqdm/--no-silence_tqdm", "silence_tqdm", default=True)
+def lint(dataset, silence_tqdm):
+    _, ext = os.path.splitext(dataset)
+    if os.path.isdir(dataset) or ext == ".zip":
+        session, model = cimpyorm.parse(dataset, InMemory(), silence_tqdm=silence_tqdm)
+    elif ext == ".db":
+        session, model = cimpyorm.load(dataset)
+    else:
+        raise ValueError("Invalid dataset path.")
+    print(tabulate(cimpyorm.api.stats(session), headers="keys", tablefmt="psql",
+                   stralign="right"))
+
+

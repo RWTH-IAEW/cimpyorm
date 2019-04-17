@@ -16,6 +16,17 @@ from tabulate import tabulate
 import cimpyorm
 from cimpyorm.backends import SQLite, InMemory
 
+try:
+    from IPython import embed
+except ImportError:
+    import code
+
+    def embed():
+        variables = globals()
+        variables.update(locals())
+        shell = code.InteractiveConsole(variables)
+        shell.interact()
+
 
 @click.group()
 def cli():
@@ -36,8 +47,8 @@ def load(path_to_db, echo=False):
     :param path_to_db: Path to the cim snapshot or a :class:`~cimpyorm.backend.Engine`.
     :param echo: Echo the SQL sent to the backend engine (SQLAlchemy option).
     """
-
-    cimpyorm.load(path_to_db, echo)
+    session, model = cimpyorm.load(path_to_db, echo)
+    embed()
 
 
 @cli.command()
@@ -45,18 +56,17 @@ def load(path_to_db, echo=False):
 @click.option("--silence_tqdm/--no-silence_tqdm", "silence_tqdm", default=False)
 def parse(dataset, silence_tqdm):
     """
-    Parse a database into a database backend and yield a database session to start querying on with the classes defined
-    in the model namespace.
-
-    Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
-    :class:`~argparse.Namespace` return value.
+    Parse a dataset into a database backend.
 
     :param dataset: Path to the cim snapshot.
+
     :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
+
     :param silence_tqdm: Silence tqdm progress bars
     """
 
-    cimpyorm.parse(dataset, SQLite(), silence_tqdm)
+    session, model = cimpyorm.parse(dataset, SQLite(), silence_tqdm)
+    embed()
 
 
 @cli.command()
@@ -72,5 +82,6 @@ def lint(dataset, silence_tqdm):
         raise ValueError("Invalid dataset path.")
     print(tabulate(cimpyorm.api.stats(session), headers="keys", tablefmt="psql",
                    stralign="right"))
+    embed()
 
 

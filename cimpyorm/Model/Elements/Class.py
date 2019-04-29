@@ -161,7 +161,7 @@ class CIMClass(SchemaElement):
         props = [prop for prop in self.props if prop.used]
         for prop in props:
             value = prop.xpath(el)
-            if prop.many_remote and prop.used:
+            if prop.many_remote and prop.used and value:
                 _id = [el.attrib.values()[0]]
                 _remote_ids = []
                 if len(set(value)) > 1:

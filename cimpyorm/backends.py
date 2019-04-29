@@ -174,6 +174,9 @@ class InMemory(Engine):
 
 
 class ClientServer(Engine):
+    """
+    A hosted backend (MariaDB, MySQL, Postgres) driver
+    """
     def __init__(self, username=None, password=None, driver=None,
                  host=None, port=None, path=None, echo=False):
         super().__init__(None, echo, driver, path)

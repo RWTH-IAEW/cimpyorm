@@ -101,6 +101,13 @@ class SchemaElement(aux.Base):
         return self._raw_property("label")
 
     @property
+    def full_label(self):
+        if not self.namespace or self.namespace=="cim":
+            return self.label
+        else:
+            return self.namespace+"_"+self.label
+
+    @property
     def _namespace(self) -> Union[str, None]:
         if not self.Attributes["namespace"]:
             if not any(self.name.startswith(ns+"_") for ns in self.nsmap.keys()):

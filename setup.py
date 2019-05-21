@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.5.11',  # Required
+    version='0.6.0',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
@@ -62,6 +62,7 @@ setup(
         'pytest (>=4.0,<5.0)',
         'pandas (>=0.24.1,<0.25.0)',
         'tabulate (>=0.8.3,<0.9.0)',
+        'tqdm'
     ],  # Optional
     # https://setuptools.readthedocs.io/en/latest/setuptools.html#dependencies-that-aren-t-in-pypi
     dependency_links=[],  # Optional

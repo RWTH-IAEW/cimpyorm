@@ -144,9 +144,13 @@ def shorten_namespace(elements, nsmap):
         for key, value in nsmap.items():
             if value in el:
                 if key == "cim":
-                    names.append(el.split(value[-1]+"}")[-1])
+                    name = el.split(value)[-1]
+                    name = name[1:] if name.startswith("}") else name
+                elif "{"+value+"}" in el:
+                    name = el.replace("{"+value+"}", key+"_")
                 else:
-                    names.append(el.replace("{"+value+"}", key+"_"))
+                    name = el.replace(value, key+"_")
+                names.append(name)
         if el.startswith("#"):
             names.append(el.split("#")[-1])
     if not _islist and len(names) == 1:

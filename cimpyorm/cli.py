@@ -80,8 +80,7 @@ def lint(dataset, silence_tqdm):
         session, model = cimpyorm.load(dataset)
     else:
         raise ValueError("Invalid dataset path.")
-    print(tabulate(cimpyorm.api.stats(session), headers="keys", tablefmt="psql",
-                   stralign="right"))
+    print(cimpyorm.lint(session, model))
     embed()
 
 

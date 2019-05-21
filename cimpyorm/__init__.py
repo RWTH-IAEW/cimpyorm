@@ -79,7 +79,7 @@ def describe(element, fmt="psql"):
 
 
 try:
-    from cimpyorm.api import parse, load, describe  # pylint: disable=wrong-import-position
+    from cimpyorm.api import parse, load, describe, stats, lint  # pylint: disable=wrong-import-position
     from cimpyorm.Model.Schema import Schema  # pylint: disable=wrong-import-position
 except ModuleNotFoundError:
     log.warning(f"Unfulfilled requirements. parse and load are not available.")

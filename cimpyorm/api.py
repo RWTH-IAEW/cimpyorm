@@ -16,10 +16,11 @@ from typing import Union, Tuple
 from argparse import Namespace
 
 from sqlalchemy.orm.session import Session
-from pandas import DataFrame
+from pandas import DataFrame, pivot_table
+from tqdm import tqdm
 
 from cimpyorm.auxiliary import log, get_path
-from cimpyorm.Model.Schema import Schema
+from cimpyorm.Model.Schema import Schema, CIMClass, CIMEnum, CIMEnumValue
 from cimpyorm.backends import SQLite, Engine, InMemory
 
 
@@ -149,6 +150,55 @@ def stats(session):
                      index=stats.keys()).sort_values("objects", ascending=False)
 
 
+def lint(session, model):
+    events = []
+    for CIM_class in tqdm(model.schema.class_hierarchy("dfs"), desc=f"Linting...", leave=True):
+        query = session.query(CIM_class.class_)
+        for prop in CIM_class.props:
+            if not prop.optional and prop.used:
+                total = query.count()
+                objects = query.filter_by(**{prop.full_label: None}).count()
+                if objects:
+                    events.append({"Class": CIM_class.label,
+                                   "Property": prop.full_label,
+                                   "Total": total,
+                                   "Type": "Missing",
+                                   "Violations": objects,
+                                   "Unique": None})
+                    log.debug(f"Missing mandatory property {prop.full_label} for "
+                              f"{objects} instances of type {CIM_class.label}.")
+                if prop.range:
+                    try:
+                        if isinstance(prop.range, CIMClass):
+                            col = getattr(CIM_class.class_, prop.full_label+"_id")
+                            validity = session.query(col).except_(session.query(
+                                prop.range.class_.id))
+                        elif isinstance(prop.range, CIMEnum):
+                            col = getattr(CIM_class.class_, prop.full_label + "_name")
+                            validity = session.query(col).except_(session.query(CIMEnumValue.name))
+                    except AttributeError:
+                        log.warning(f"Couldn't determine validity of {prop.full_label} on "
+                                    f"{CIM_class.label}. The linter does not yet support "
+                                    f"many-to-many relationships.")
+                        # ToDo: Association table errors are currently not caught
+                    else:
+                        count = validity.count()
+                        # query.except() returns (None) if right hand side table is empty
+                        if count > 1 or (count == 1 and tuple(validity.one())[0] is not None):
+                            non_unique = query.filter(col.in_(
+                                val[0] for val in validity.all())).count()
+                            events.append({"Class": CIM_class.label,
+                                           "Property": prop.full_label,
+                                           "Total": total,
+                                           "Type": "Invalid",
+                                           "Violations": non_unique,
+                                           "Unique": count
+                                           })
+
+    return pivot_table(DataFrame(events), values=["Violations", "Unique"],
+                       index=["Type", "Class", "Total", "Property"])
+
+
 def docker_parse() -> None:
     """
     Dummy function for parsing in shared docker tmp directory.
@@ -171,8 +221,9 @@ def describe(element, fmt: str = "psql") -> None:
 
 
 if __name__ == "__main__":
-    pass
-    # root = get_path("DATASETROOT")
+    root = get_path("DATASETROOT")
+    session, model = load(os.path.join(root, "FullGrid", "out.db"))
+    print(lint(session, model))
     # # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
     # #                        os.path.isdir(os.path.join(root, folder)) or
     # #                        os.path.join(root, folder).endswith(".zip")])

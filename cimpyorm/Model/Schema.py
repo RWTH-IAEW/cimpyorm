@@ -16,7 +16,7 @@ from collections import defaultdict
 import lxml.etree as et
 from lxml.etree import XPath
 import networkx as nx
-from networkx import DiGraph, bfs_tree
+from networkx import DiGraph, bfs_tree, dfs_tree
 from networkx.exception import NetworkXNoPath
 from sqlalchemy import Column, TEXT, Integer
 from sqlalchemy.exc import InvalidRequestError
@@ -130,7 +130,9 @@ class Schema:
         return Namespace(**{c.name: c.class_ for c in self.session.query(CIMClass).all()},
                          **{"dt": Namespace(**{c.name: c for c in self.session.query(CIMDT).all()})},
                          **{"classes": Namespace(**{c.name: c for c in self.session.query(CIMClass).all()})},
-                         **{"enum": Namespace(**{c.name: c for c in self.session.query(CIMEnum).all()})})
+                         **{"enum": Namespace(**{c.name: c for c in self.session.query(
+                             CIMEnum).all()})},
+                         **{"schema": self})
 
     def _generate(self):
         xp_type_res = XPath(f"rdf:type/@rdf:resource", namespaces=self.root.nsmap)
@@ -201,27 +203,36 @@ class Schema:
     def map(self):
         if not self.g:
             g = DiGraph()
+            classnames = [_[0] for _ in self.session.query(CIMClass.name).all()]
             classes = self.session.query(CIMClass).all()
             enums = self.session.query(CIMEnum).all()
-            g.add_nodes_from(classes)
-            g.add_nodes_from(enums)
-            g.add_nodes_from(self.session.query(CIMProp).all())
+            enumnames = [_[0] for _ in self.session.query(CIMEnum.name).all()]
+            propnames = [_[0] for _ in self.session.query(CIMProp.name).all()]
+            g.add_nodes_from(classnames)
+            g.add_nodes_from(enumnames)
+            g.add_nodes_from(propnames)
 
             for node in classes + enums:
                 try:
                     for prop in node.all_props.values():
                         if prop.range:
-                            g.add_edge(node, prop.range, label=prop.label)
+                            g.add_edge(node.name, prop.range.name, label=prop.label)
                         else:
-                            g.add_edge(node, prop, label=prop.label)
+                            g.add_edge(node.name, prop.name, label=prop.label)
                 except AttributeError:
                     pass
             self.g = g
         return self.g
 
     def path(self, source, destination):
+        from fuzzyset import FuzzySet
         if source == destination:
             return
+        fuzz = FuzzySet(self.map.nodes)
+        if source not in self.map.nodes:
+            source = fuzzymatch(fuzz, source)
+        if destination not in self.map.nodes:
+            destination = fuzzymatch(fuzz, destination)
         try:
             path = nx.shortest_path(self.map, source, destination)
         except NetworkXNoPath:
@@ -241,10 +252,7 @@ class Schema:
             self.Elements[Category] = dict(CatElements)
 
     def init_model(self, session):
-        g = self.inheritance_graph
-
-        additionalNodes = list(bfs_tree(g, "__root__"))
-        additionalNodes.remove("__root__")
+        additionalNodes = self.class_hierarchy()
 
         hierarchy = additionalNodes
         try:
@@ -258,6 +266,23 @@ class Schema:
         for c in hierarchy:
             c.generate(nsmap)
         log.info(f"Generated {len(hierarchy)} classes")
+
+    def class_hierarchy(self, mode="bfs"):
+        if mode == "dfs":
+            nodes = list(dfs_tree(self.inheritance_graph, "__root__"))
+        else:
+            nodes = list(bfs_tree(self.inheritance_graph, "__root__"))
+        nodes.remove("__root__")
+        return nodes
+
+
+def fuzzymatch(set, value):
+    result = set.get(value)
+    if result and result[0][0]>0.2:
+        log.warning(f"Did you mean {result[0][1]} (matched from {value})?")
+        return result[0][1]
+    else:
+        return None
 
 
 class SchemaInfo(aux.Base):

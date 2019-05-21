@@ -3,19 +3,19 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to cimpyorm's documentation!
+Welcome to CIMPyORM's documentation!
 ====================================
 
 *************************
 Installation
 *************************
-cimpyorm can be installed from `pypi <https://pypi.org/project/cimpyorm/>`_:
+CIMPyORM can be installed from `pypi <https://pypi.org/project/cimpyorm/>`_:
 
 ``pip install cimpyorm``
 
-cimpyorm comes pre-loaded with a CIM schema provided by
+CIMPyORM comes pre-loaded with a CIM schema provided by
 `ENTSO-E <https://www.entsoe.eu/digital/common-information-model/#common-grid-model-exchange-specification-cgmes>`_
-called Common Grid Model Exchange Specification (CGMES).
+called Common Grid Model Exchange Specification (CGMES v. 2.4.15).
 
 
 .. toctree::
@@ -25,4 +25,5 @@ called Common Grid Model Exchange Specification (CGMES).
    about
    quickstart
    Engines
+   Linter
    Exploring

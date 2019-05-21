@@ -14,12 +14,13 @@
 #
 import os
 import sys
+sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('/app/'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'cimpyorm'
-copyright = '2019, Institute for High Voltage Technology, RWTH Aachen'
+project = 'CIMPyORM'
+copyright = '2018-2019, Institute for High Voltage Technology, RWTH Aachen'
 author = 'Thomas Offergeld'
 
 try:
@@ -28,19 +29,22 @@ except KeyError:
     _rtd = False
 
 if not _rtd:
-    import toml
-    from pathlib import Path
-    from cimpyorm.auxiliary import get_path
+    try:
+        import toml
+        from pathlib import Path
+        from cimpyorm.auxiliary import get_path
 
-    _path = Path(get_path("PACKAGEROOT")).parent
-    _toml_meta = toml.loads(open(os.path.join(_path, "pyproject.toml")).read())
-    _toml_name = _toml_meta["tool"]["poetry"]["name"]
-    _toml_version = _toml_meta["tool"]["poetry"]["version"]
+        _path = Path(get_path("PACKAGEROOT")).parent
+        _toml_meta = toml.loads(open(os.path.join(_path, "pyproject.toml")).read())
+        _toml_name = _toml_meta["tool"]["poetry"]["name"]
+        _toml_version = _toml_meta["tool"]["poetry"]["version"]
 
-    # The short X.Y version
-    version = ".".join(_toml_version.split(".")[0:2])
-    # The full version, including alpha/beta/rc tags
-    release = _toml_version
+        # The short X.Y version
+        version = ".".join(_toml_version.split(".")[0:2])
+        # The full version, including alpha/beta/rc tags
+        release = _toml_version
+    except ImportError:
+        pass
 
 # -- General configuration ---------------------------------------------------
 

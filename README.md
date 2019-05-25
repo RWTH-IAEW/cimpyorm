@@ -5,6 +5,11 @@
 ```pip install cimpyorm```
 
 ---
+##### Documentation
+
+Some documentation can be found at [readthedocs](https://cimpyorm.readthedocs.io/en/latest/).
+
+---
 ## Usage
 ```python
 import cimpyorm

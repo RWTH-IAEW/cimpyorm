@@ -23,6 +23,12 @@ class Parseable:
     ObjectName = None
     _schema_class = None
 
+    def __str__(self):
+        _str = [f"{self._schema_class.name} object with the following properties:"]
+        for prop in self._schema_class.props:
+            _str.append(prop.label)
+        return r"\n".join(_str)
+
     @classmethod
     def compile_map(cls, nsmap):
         """

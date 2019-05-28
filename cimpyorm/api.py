@@ -223,6 +223,7 @@ def describe(element, fmt: str = "psql") -> None:
 if __name__ == "__main__":
     root = get_path("DATASETROOT")
     session, model = load(os.path.join(root, "FullGrid", "out.db"))
+    session.query(model.ACLineSegment).first().__repr__()
     print(lint(session, model))
     # # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
     # #                        os.path.isdir(os.path.join(root, folder)) or

@@ -58,7 +58,7 @@ def parse_entries(entries, schema, silence_tqdm=False):
             for uuid, element in tqdm(elements.items(), desc=f"Reading {classname}", leave=False,
                                       disable=silence_tqdm):
                 argmap, insertables = classes[classname].parse_values(element, schema.session)
-                created.append(classes[classname].class_(id="_"+uuid,
+                created.append(classes[classname].class_(id=uuid,
                                                          **argmap))
                 for insertable in insertables:
                     schema.session.execute(insertable)
@@ -70,15 +70,11 @@ def parse_entries(entries, schema, silence_tqdm=False):
 def determine_uuid(element, xp):
     uuid = None
     try:
-        _id = xp["id"](element)[0]
-        if _id.startswith("_"):
-            _id = _id[1:]
-        uuid = _id
+        uuid = xp["id"](element)[0]
     except IndexError:
         pass
     try:
-        about = xp["about"](element)[0].split("urn:uuid:")[-1].split("#_")[-1]
-        uuid = about
+        uuid = xp["about"](element)[0].split("urn:uuid:")[-1].split("#")[-1]
     except IndexError:
         pass
     return uuid

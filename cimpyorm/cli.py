@@ -74,7 +74,7 @@ def parse(dataset, silence_tqdm):
 @click.option("--silence_tqdm/--no-silence_tqdm", "silence_tqdm", default=True)
 def lint(dataset, silence_tqdm):
     _, ext = os.path.splitext(dataset)
-    if os.path.isdir(dataset) or ext == ".zip":
+    if os.path.isdir(dataset) or ext == ".zip" or ext == ".rdf":
         session, model = cimpyorm.parse(dataset, InMemory(), silence_tqdm=silence_tqdm)
     elif ext == ".db":
         session, model = cimpyorm.load(dataset)

@@ -9,15 +9,15 @@
 #  For further information see LICENSE in the project's root directory.
 #
 
-from sys import stdout
-
 from itertools import chain
 from collections import defaultdict
 from functools import lru_cache
 
 from tqdm import tqdm
 
-from cimpyorm.auxiliary import HDict, log, parseable_files, shorten_namespace
+from cimpyorm.auxiliary import HDict, get_logger, parseable_files, shorten_namespace
+
+log = get_logger(__name__)
 
 
 def get_files(dataset):

@@ -11,7 +11,6 @@
 import os
 
 import click
-from tabulate import tabulate
 
 import cimpyorm
 from cimpyorm.backends import SQLite, InMemory
@@ -47,7 +46,7 @@ def load(path_to_db, echo=False):
     :param path_to_db: Path to the cim snapshot or a :class:`~cimpyorm.backend.Engine`.
     :param echo: Echo the SQL sent to the backend engine (SQLAlchemy option).
     """
-    session, model = cimpyorm.load(path_to_db, echo)
+    s, m = session, model = cimpyorm.load(path_to_db, echo)
     embed()
 
 
@@ -65,7 +64,7 @@ def parse(dataset, silence_tqdm):
     :param silence_tqdm: Silence tqdm progress bars
     """
 
-    session, model = cimpyorm.parse(dataset, SQLite(), silence_tqdm)
+    s, m = session, model = cimpyorm.parse(dataset, SQLite(), silence_tqdm)
     embed()
 
 
@@ -75,12 +74,13 @@ def parse(dataset, silence_tqdm):
 def lint(dataset, silence_tqdm):
     _, ext = os.path.splitext(dataset)
     if os.path.isdir(dataset) or ext == ".zip" or ext == ".rdf":
-        session, model = cimpyorm.parse(dataset, InMemory(), silence_tqdm=silence_tqdm)
+        s, m = session, model = cimpyorm.parse(dataset, InMemory(), silence_tqdm=silence_tqdm)
     elif ext == ".db":
-        session, model = cimpyorm.load(dataset)
+        s, m = session, model = cimpyorm.load(dataset)
     else:
         raise ValueError("Invalid dataset path.")
-    print(cimpyorm.lint(session, model))
+    res_lint = cimpyorm.lint(session, model)
+    print(res_lint)
     embed()
 
 

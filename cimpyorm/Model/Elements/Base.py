@@ -4,8 +4,10 @@ from lxml import etree
 from lxml.etree import XPath
 from sqlalchemy import Column, String, ForeignKey
 
-from cimpyorm.auxiliary import log
+from cimpyorm.auxiliary import get_logger
 from cimpyorm.Model import auxiliary as aux
+
+log = get_logger(__name__)
 
 
 def prefix_ns(func):
@@ -27,14 +29,22 @@ def prefix_ns(func):
                     element = "".join(element.split("#")[1:])
                 for key, value in obj.nsmap.items():
                     if value in element:
-                        element = element.replace(value, key+"_")
+                        if key == "cim":
+                            # Default namespace: cim
+                            element = element.replace(value, "")
+                        else:
+                            element = element.replace(value, key+"_")
                 res.append(element)
         elif s:
             if s.startswith("#"):
                 s = "".join(s.split("#")[1:])
             for key, value in obj.nsmap.items():
                 if value in s:
-                    s = s.replace(value, key + "_")
+                    if key == "cim":
+                        # Default namespace: cim
+                        s = s.replace(value, "")
+                    else:
+                        s = s.replace(value, key + "_")
             res = s
         else:
             res = None
@@ -53,7 +63,6 @@ class SchemaElement(aux.Base):
     label = Column(String(50))
     namespace = Column(String(30))
     type_ = Column(String(50))
-    #comment = Column(String(300))
 
     __mapper_args__ = {
         "polymorphic_on": type_,

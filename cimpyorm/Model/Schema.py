@@ -30,17 +30,17 @@ from cimpyorm.backends import InMemory
 
 
 class Schema:
-    def __init__(self, session=None, version: str = "16"):
+    def __init__(self, session=None, version: str = "16", rdfs_path=None):
         """
-        Initialize a Backend object, containing information about the schema elements
-        :param file_or_tree: The schema file or a parsed root
+        Initialize a Backend object, containing information about the schema elements.
         """
         self.g = None
         if not session:
             backend = InMemory()
             backend.reset()
             session = backend.session
-        rdfs_path = find_rdfs_path(version)
+        if not rdfs_path:
+            rdfs_path = find_rdfs_path(version)
         if not rdfs_path:
             raise FileNotFoundError("Failed to find schema file. Please provide one.")
         tree = merge(rdfs_path)

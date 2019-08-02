@@ -5,9 +5,11 @@ from lxml.etree import XPath
 from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table
 from sqlalchemy.orm import relationship, backref
 
-from cimpyorm.auxiliary import log
+from cimpyorm.auxiliary import get_logger
 from cimpyorm.Model import auxiliary as aux
 from cimpyorm.Model.Elements import SchemaElement, CIMPackage, CIMClass, CIMEnumValue, CIMEnum, prefix_ns
+
+log = get_logger(__name__)
 
 
 class CIMDT(SchemaElement):
@@ -493,7 +495,9 @@ class CIMProp(SchemaElement):
     @property
     def mapped_datatype(self):  # pylint: disable=inconsistent-return-statements
         if self.datatype:
-            if self.datatype.stereotype == "Primitive":
+            if not hasattr(self.datatype, "stereotype"):
+                return self.datatype.name
+            elif self.datatype.stereotype == "Primitive":
                 return self.datatype.name
             elif self.datatype.stereotype == "CIMDatatype":
                 return self.datatype.mapped_datatype

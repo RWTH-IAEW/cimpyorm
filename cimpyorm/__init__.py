@@ -15,8 +15,23 @@ This module sets up and provides configuration and imports.
 # pylint: disable=ungrouped-imports
 
 import os
+import logging
 
-from cimpyorm.auxiliary import log, get_path, _CONFIGPATH, CONFIG, _TESTROOT, _PACKAGEROOT
+# default loglevel
+loglevel = logging.INFO
+
+from cimpyorm.auxiliary import get_path, _CONFIGPATH, CONFIG, _TESTROOT, _PACKAGEROOT, get_logger, get_file_handler, \
+    get_console_handler
+
+# Configure root logger and default handler
+rootlogger = logging.getLogger()
+rootlogger.setLevel(logging.ERROR)
+
+# Package logger that controls all other loggers
+log = get_logger(__name__)
+consolehandler = get_console_handler()
+log.addHandler(consolehandler)
+log.setLevel(loglevel)
 
 if not os.path.isfile(_CONFIGPATH):
     with open(_CONFIGPATH, "w+") as f:
@@ -73,13 +88,9 @@ with open(_CONFIGPATH, "w+") as f:
     # Update config.ini
     CONFIG.write(f)
 
-
-def describe(element, fmt="psql"):
-    element.describe(fmt)
-
-
 try:
     from cimpyorm.api import parse, load, describe, stats, lint  # pylint: disable=wrong-import-position
     from cimpyorm.Model.Schema import Schema  # pylint: disable=wrong-import-position
+    from cimpyorm.auxiliary import add_schema  # pylint: disable=wrong-import-position
 except ModuleNotFoundError:
     log.warning(f"Unfulfilled requirements. parse and load are not available.")

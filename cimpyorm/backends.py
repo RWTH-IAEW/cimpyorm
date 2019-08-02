@@ -12,7 +12,9 @@ from networkx import bfs_tree
 
 # pylint: disable=too-many-arguments
 import cimpyorm.Model.auxiliary as aux
-from cimpyorm.auxiliary import log
+from cimpyorm.auxiliary import get_logger
+
+log = get_logger(__name__)
 
 
 class Engine(ABC):
@@ -25,15 +27,8 @@ class Engine(ABC):
 
     @property
     def engine(self) -> SA_Engine:
-        """
-        :param echo:
-
-        :param database:
-
-        :return:
-        """
         if not self._engine:
-            log.info(f"Database: {self.path}")
+            log.info(f"Database: {self}.")
             engine = self._connect_engine()
             self._engine = engine
         return self._engine
@@ -65,10 +60,6 @@ class Engine(ABC):
     def reset(self) -> None:
         """
         Reset the table metadata for declarative classes.
-
-        :param engine: A sqlalchemy db-engine to reset
-
-        :return: None
         """
         import cimpyorm.Model.Elements as Elements
         import cimpyorm.Model.Schema as Schema
@@ -111,6 +102,9 @@ class SQLite(Engine):
         self.dialect = "sqlite"
         super().__init__(self.dialect, echo, driver, path)
 
+    def __str__(self):
+        return f"{self.__class__.__name__} at {self.path}"
+
     def drop(self):
         try:
             os.remove(self.path)
@@ -118,6 +112,9 @@ class SQLite(Engine):
             self._engine = None
         except FileNotFoundError:
             pass
+        except PermissionError:
+            raise UserWarning("Can't remove database while there is still a connection open. "
+                              "Please close the connection first using session.close().")
 
     @property
     def engine(self):
@@ -163,6 +160,9 @@ class InMemory(Engine):
         self.dialect = "sqlite"
         super().__init__(self.dialect, echo, driver)
 
+    def __str__(self):
+        return f"{self.__class__.__name__}"
+
     def drop(self):
         pass
 
@@ -184,6 +184,9 @@ class ClientServer(Engine):
         self.password = password
         self.hostname = host
         self.port = port
+
+    def __str__(self):
+        return f"{self.__class__.__name__} at {self.remote_path}"
 
     @property
     def remote_path(self):

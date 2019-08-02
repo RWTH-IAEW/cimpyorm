@@ -14,8 +14,10 @@ from typing import Collection, Iterable
 from pathlib import Path
 import configparser
 import logging
+from logging.handlers import RotatingFileHandler
 from zipfile import ZipFile
 from itertools import chain
+from shutil import copytree, copy
 
 
 class HDict(dict):
@@ -35,6 +37,21 @@ def chunks(l: Collection, n: int) -> Iterable:
         yield l[i:i+n]
 
 
+def add_schema(version_number, path):
+    config = configparser.ConfigParser()
+    config.read(get_path("CONFIGPATH"))
+    # assert isinstance(version_number, int)
+    if f"CIM{version_number}" not in os.listdir(config["Paths"]["Schemaroot"]):
+        dst = os.path.join(config["Paths"]["Schemaroot"], f"CIM{version_number}")
+        if os.path.isfile(path):
+            os.makedirs(dst)
+            copy(path, dst)
+        elif os.path.isdir(path):
+            copytree(path, dst)
+    else:
+        raise FileExistsError(r"A schema for this version number already exists")
+
+
 class CustomFormatter(logging.Formatter):
     """
     Elapsed time logging formatter.
@@ -44,14 +61,38 @@ class CustomFormatter(logging.Formatter):
                f"{round(record.relativeCreated%1000)}"
 
 
-log = logging.getLogger("cim_orm")
-if not log.handlers:
-    log.setLevel(logging.INFO)
+def get_console_handler():
     handler = logging.StreamHandler()
-    log.addHandler(handler)
-    formatter = CustomFormatter(fmt='T+%(asctime)10ss:%(levelname)8s: %(message)s')
+    # formatter = CustomFormatter(fmt='T+%(asctime)10ss:%(levelname)8s: %(name)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s:%(levelname)8s:%(name)s - %(message)s")
     handler.setFormatter(formatter)
-    log.debug("Logger configured.")
+    return handler
+
+
+def get_file_handler(filename):
+    """
+    Default FileHandler
+    :param filename:
+    :return:
+    """
+    try:
+        os.remove(filename)
+    except FileNotFoundError:
+        pass
+    handler = RotatingFileHandler(filename, mode="w", maxBytes=4e5, backupCount=1)
+    # formatter = CustomFormatter(fmt='T+%(asctime)10ss:%(levelname)8s: %(name)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s:%(levelname)8s:%(name)s - %(message)s")
+    handler.setFormatter(formatter)
+    return handler
+
+
+def get_logger(name):
+    logger = logging.getLogger(name)
+    logger.propagate = True
+    return logger
+
+
+log = get_logger(__name__)
 
 CONFIG = configparser.ConfigParser()
 # Set default paths
@@ -155,6 +196,8 @@ def shorten_namespace(elements, nsmap):
             names.append(el.split("#")[-1])
     if not _islist and len(names) == 1:
         names = names[0]
+    if not names:
+        return None
     return names
 
 

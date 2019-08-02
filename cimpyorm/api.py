@@ -19,12 +19,15 @@ from sqlalchemy.orm.session import Session
 from pandas import DataFrame, pivot_table
 from tqdm import tqdm
 
-from cimpyorm.auxiliary import log, get_path
+from cimpyorm.auxiliary import get_logger, get_path, find_rdfs_path
 from cimpyorm.Model.Schema import Schema, CIMClass, CIMEnum, CIMEnumValue
-from cimpyorm.backends import SQLite, Engine, InMemory
+from cimpyorm.backends import SQLite, Engine
+
+log = get_logger(__name__)
 
 
-def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = None):
+def configure(schemata: Union[Path, str] = None,
+              datasets: Union[Path, str] = None):
     """
     Configure paths to schemata or update the DATASETROOT used for tests.
 
@@ -42,7 +45,8 @@ def configure(schemata: Union[Path, str] = None, datasets: Union[Path, str] = No
         config.write(configfile)
 
 
-def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, Namespace]:
+def load(path_to_db: Union[Engine, str],
+         echo: bool = False) -> Tuple[Session, Namespace]:
     """
     Load an already parsed database from disk or connect to a server and yield a database session to start querying on
     with the classes defined in the model namespace.
@@ -78,7 +82,9 @@ def load(path_to_db: Union[Engine, str], echo: bool = False) -> Tuple[Session, N
 
 
 def parse(dataset: Union[str, Path],
-          backend: Engine = SQLite(),
+          backend=SQLite,
+          schema: Union[str, Path] = None,
+          log_to_file: Union[bool, Path, str] = False,
           silence_tqdm: bool = False) -> Tuple[Session, Namespace]:
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
@@ -89,16 +95,26 @@ def parse(dataset: Union[str, Path],
 
     :param dataset: Path to the cim snapshot.
     :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
+    :param schema: Location of the RDF schema to be used to parse the dataset (Folder of multiple RDF schemata or a
+    single schema file).
+    :param log_to_file: Pass logging output to a file for this ingest only.
     :param silence_tqdm: Silence tqdm progress bars
 
     :return: :class:`sqlalchemy.orm.session.Session`, :class:`argparse.Namespace`
     """
+    #   Imports in function are due to SQLAlchemy table initialisation
     from cimpyorm import Parser
+    if log_to_file:
+        handler, packagelogger = create_logfile(dataset, log_to_file)
+    try:
+        backend = backend()
+    except TypeError:
+        pass
     backend.update_path(dataset)
-    # Reset database
+    #   Reset database
     backend.drop()
     backend.reset()
-    # And connect
+    #   And connect
     engine, session = backend.connect()
 
     files = Parser.get_files(dataset)
@@ -106,15 +122,18 @@ def parse(dataset: Union[str, Path],
     sources = frozenset([SourceInfo(file) for file in files])
     session.add_all(sources)
     session.commit()
-
-    cim_version = Parser.get_cim_version(sources)
-
-    schema = Schema(version=cim_version, session=session)
-    backend.generate_tables(schema)
+    if not schema:
+        #   Try to infer the CIM schema
+        cim_version = Parser.get_cim_version(sources)
+        rdfs_path = find_rdfs_path(cim_version)
+    else:
+        rdfs_path = schema
+    model_schema = Schema(session=session, rdfs_path=rdfs_path)
+    backend.generate_tables(model_schema)
 
     log.info(f"Parsing data.")
     entries = Parser.merge_sources(sources)
-    elements = Parser.parse_entries(entries, schema, silence_tqdm=silence_tqdm)
+    elements = Parser.parse_entries(entries, model_schema, silence_tqdm=silence_tqdm)
     log.info(f"Passing {len(elements):,} objects to database.")
     session.bulk_save_objects(elements)
     session.flush()
@@ -126,10 +145,29 @@ def parse(dataset: Union[str, Path],
         log.debug("Enabling foreign key checks in mysql database.")
         session.execute("SET foreign_key_checks='ON'")
 
-    log.info("Exit.")
+    log.info("Finished.")
 
-    model = schema.model
+    model = model_schema.model
+    if log_to_file:
+        packagelogger.removeHandler(handler)
     return session, model
+
+
+def create_logfile(dataset, log_to_file):
+    from cimpyorm import log as packagelogger
+    from cimpyorm.auxiliary import get_file_handler
+    if not isinstance(log_to_file, bool) and os.path.isabs(log_to_file):
+        handler = get_file_handler(log_to_file)
+    elif os.path.isfile(dataset):
+        if isinstance(log_to_file, (str, Path)):
+            logfile = os.path.join(os.path.dirname(dataset), log_to_file)
+        else:
+            logfile = os.path.join(os.path.dirname(dataset), "import.log")
+        handler = get_file_handler(logfile)
+    else:
+        handler = get_file_handler(os.path.join(dataset, "import.log"))
+    packagelogger.addHandler(handler)
+    return handler, packagelogger
 
 
 def stats(session):
@@ -151,6 +189,15 @@ def stats(session):
 
 
 def lint(session, model):
+    """
+    Check the model for missing obligatory values and references and for invalid references (foreign key validation)
+    and return the results in a pandas pivot-table.
+
+    :param session: The SQLAlchemy session object (obtained from parse/load).
+    :param model: The parsed CIMPyORM model (obtained from parse/load).
+
+    :return: Pandas pivot-table.
+    """
     events = []
     for CIM_class in tqdm(model.schema.class_hierarchy("dfs"), desc=f"Linting...", leave=True):
         query = session.query(CIM_class.class_)
@@ -206,28 +253,16 @@ def docker_parse() -> None:
     parse(r"/tmp")
 
 
-def describe(element, fmt: str = "psql") -> None:
+def describe(element,
+             fmt: str = "psql") -> None:
     """
     Give a description of an object.
 
     :param element: The element to describe.
 
-    :param fmt: Format string for tabulate package.
+    :param fmt: Format string for tabulate package (default postgres formatting).
     """
     try:
         element.describe(fmt)
     except AttributeError:
         print(f"Element of type {type(element)} doesn't provide descriptions.")
-
-
-if __name__ == "__main__":
-    root = get_path("DATASETROOT")
-    session, model = load(os.path.join(root, "FullGrid", "out.db"))
-    session.query(model.ACLineSegment).first().__repr__()
-    print(lint(session, model))
-    # # db_session, m = parse([os.path.abspath(os.path.join(root, folder)) for folder in os.listdir(root) if
-    # #                        os.path.isdir(os.path.join(root, folder)) or
-    # #                        os.path.join(root, folder).endswith(".zip")])
-    # db_session, m = parse(os.path.join(get_path("DATASETROOT"), "FullGrid"), InMemory())
-    # print(db_session.query(m.IdentifiedObject).first().name)  # pylint: disable=no-member
-    # db_session.close()

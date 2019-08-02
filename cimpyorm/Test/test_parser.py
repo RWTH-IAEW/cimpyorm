@@ -43,7 +43,8 @@ def test_single_object(cgmes_schema):
             'b0ch': 2.62637e-05,
             'g0ch': 3.08e-05,
             'r0': 6.6,
-            'shortCircuitEndTemperature': 160.0, 'x0': 204.6}
+            'shortCircuitEndTemperature': 160.0,
+            'x0': 204.6}
     assert ACL.parse_values(et.fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[0] == map
 
 

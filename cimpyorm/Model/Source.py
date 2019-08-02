@@ -90,7 +90,11 @@ class SourceInfo(aux.Base):
         """
         tree = self.tree
         nsmap = tree.getroot().nsmap
-        source = tree.xpath("md:FullModel", namespaces=nsmap)[0]
+        try:
+            source = tree.xpath("md:FullModel", namespaces=nsmap)[0]
+        except IndexError:
+            # No FullModel instance present.
+            return None, None
         full_model_id = set(source.xpath("@rdf:about", namespaces=nsmap)) | set(
             source.xpath("@rdf:ID", namespaces=nsmap))
         assert len(full_model_id) == 1

@@ -6,10 +6,12 @@ from sqlalchemy import Column, String, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from tabulate import tabulate
 
-from cimpyorm.auxiliary import log, shorten_namespace
+from cimpyorm.auxiliary import get_logger, shorten_namespace
 from cimpyorm.Model.Elements import SchemaElement, CIMPackage, CIMEnum, prefix_ns
 from cimpyorm.Model.Parseable import Parseable
 from cimpyorm.auxiliary import chunks
+
+log = get_logger(__name__)
 
 
 class CIMClass(SchemaElement):
@@ -238,7 +240,10 @@ class CIMClass(SchemaElement):
             try:
                 table["Datatype"].append(prop.datatype.label)
             except AttributeError:
-                table["Datatype"].append(f"*{prop.range.label}")
+                try:
+                    table["Datatype"].append(f"*{prop.range.label}")
+                except AttributeError:
+                    table["Datatype"].append(None)
             try:
                 nominator_unit = prop.datatype.unit.symbol.label
                 if nominator_unit.lower() == "none":

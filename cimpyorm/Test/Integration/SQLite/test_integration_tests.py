@@ -12,7 +12,7 @@ def test_parse_inmemory(full_grid):
         cimpyorm.auxiliary.get_path("SCHEMAROOT")
     except KeyError:
         pytest.skip(f"Schemata not configured")
-    session, m = parse(full_grid, InMemory())
+    session, m = parse(full_grid, InMemory)
     session.close()
 
 

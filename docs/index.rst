@@ -24,6 +24,7 @@ called Common Grid Model Exchange Specification (CGMES v. 2.4.15).
 
    about
    quickstart
+   Example Datasets
    Engines
    Linter
    Exploring

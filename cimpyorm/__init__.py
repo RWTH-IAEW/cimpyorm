@@ -92,5 +92,6 @@ try:
     from cimpyorm.api import parse, load, describe, stats, lint  # pylint: disable=wrong-import-position
     from cimpyorm.Model.Schema import Schema  # pylint: disable=wrong-import-position
     from cimpyorm.auxiliary import add_schema  # pylint: disable=wrong-import-position
+    from cimpyorm import datasets
 except ModuleNotFoundError:
     log.warning(f"Unfulfilled requirements. parse and load are not available.")

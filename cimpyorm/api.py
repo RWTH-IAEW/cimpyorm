@@ -67,7 +67,7 @@ def load(path_to_db: Union[Engine, str],
     elif os.path.isfile(path_to_db):
         _backend = SQLite(path_to_db, echo)
     else:
-        raise NotImplementedError(f"Unable to connect to database {path_to_db}")
+        raise FileNotFoundError(f"Unable to connect to database {path_to_db}")
 
     session = _backend.session
     _backend.reset()

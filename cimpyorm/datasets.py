@@ -15,20 +15,29 @@ from cimpyorm import parse, load, get_path
 
 def ENTSOE_FullGrid(refresh=False):
     if not refresh:
-        return load(os.path.join(get_path("DATASETROOT"), "FullGrid", "out.db"))
+        try:
+            return load(os.path.join(get_path("DATASETROOT"), "FullGrid", "out.db"))
+        except FileNotFoundError:
+            return parse(os.path.join(get_path("DATASETROOT"), "FullGrid"))
     else:
         return parse(os.path.join(get_path("DATASETROOT"), "FullGrid"))
 
 
 def ENTSOE_MiniBB(refresh=False):
     if not refresh:
-        return load(os.path.join(get_path("DATASETROOT"), "MiniGrid_BusBranch", "out.db"))
+        try:
+            return load(os.path.join(get_path("DATASETROOT"), "MiniGrid_BusBranch", "out.db"))
+        except FileNotFoundError:
+            return parse(os.path.join(get_path("DATASETROOT"), "MiniGrid_BusBranch"))
     else:
         return parse(os.path.join(get_path("DATASETROOT"), "MiniGrid_BusBranch"))
 
 
 def ENTSOE_MiniNB(refresh=False):
     if not refresh:
-        return load(os.path.join(get_path("DATASETROOT"), "MiniGrid_NodeBreaker", "out.db"))
+        try:
+            return load(os.path.join(get_path("DATASETROOT"), "MiniGrid_NodeBreaker", "out.db"))
+        except FileNotFoundError:
+            return parse(os.path.join(get_path("DATASETROOT"), "MiniGrid_NodeBreaker"))
     else:
         return parse(os.path.join(get_path("DATASETROOT"), "MiniGrid_NodeBreaker"))

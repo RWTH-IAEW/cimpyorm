@@ -4,7 +4,6 @@ from abc import ABC
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine as SA_Engine
-from sqlalchemy.orm.session import Session as SA_Session
 from sqlalchemy.exc import OperationalError, InternalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -12,7 +11,7 @@ from networkx import bfs_tree
 
 # pylint: disable=too-many-arguments
 import cimpyorm.Model.auxiliary as aux
-from cimpyorm.auxiliary import get_logger
+from cimpyorm.auxiliary import get_logger, Dataset
 
 log = get_logger(__name__)
 
@@ -34,13 +33,13 @@ class Engine(ABC):
         return self._engine
 
     @property
-    def session(self) -> SA_Session:
-        Session = sessionmaker(bind=self.engine)
-        session = Session()
-        return session
+    def ORM(self) -> Dataset:
+        Session = sessionmaker(bind=self.engine, class_=Dataset)
+        ORM = Session()
+        return ORM
 
     def connect(self):
-        return self.engine, self.session
+        return self.engine, self.ORM
 
     def update_path(self, path):
         pass
@@ -251,8 +250,8 @@ class MariaDB(ClientServer):
         self.dialect = "mysql"
 
     @property
-    def session(self):
-        session = super().session
+    def ORM(self):
+        session = super().ORM
         log.debug("Deferring foreign key checks in mysql database.")
         session.execute("SET foreign_key_checks='OFF'")
         return session
@@ -283,8 +282,8 @@ class MySQL(ClientServer):
         self.dialect = "mysql"
 
     @property
-    def session(self):
-        session = super().session
+    def ORM(self):
+        session = super().ORM
         log.debug("Deferring foreign key checks in mysql database.")
         session.execute("SET foreign_key_checks='OFF'")
         return session

@@ -11,7 +11,7 @@ def test_persisted_classes(cgmes_schema):
 
 def test_summary(cgmes_schema):
     schema = cgmes_schema
-    assert schema.model.classes.ACLineSegment.property_table().shape == (27, 8)
+    assert schema.model.classes.ACLineSegment.property_table().shape == (27, 6)
 
 
 def test_description_CIMClass(cgmes_schema):

@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.7.3',  # Required
+    version='0.7.5',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
@@ -36,7 +36,7 @@ setup(
     long_description_content_type='text/markdown',  # Optional (see note above)
     url="http://www.ifht.rwth-aachen.de",  # Optional
     author="Thomas Offergeld",  # Optional
-    author_email="offergeld@ifht.rwth-aachen.de",  # Optional
+    author_email="t.offergeld@iaew.rwth-aachen.de",  # Optional
     # For a list of valid classifiers, see https://pypi.org/classifiers/
     classifiers=[
         'Development Status :: 3 - Alpha', 'Intended Audience :: Developers',

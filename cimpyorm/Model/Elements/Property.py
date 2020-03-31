@@ -4,6 +4,7 @@ from typing import Union
 from lxml.etree import XPath
 from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table
 from sqlalchemy.orm import relationship, backref
+import pandas as pd
 
 from cimpyorm.auxiliary import get_logger
 from cimpyorm.Model import auxiliary as aux
@@ -72,6 +73,25 @@ class CIMDT(SchemaElement):
     @property
     def mapped_datatype(self):
         return self.value.datatype.name
+
+    def to_html(self, **kwargs):
+        df = self.property_table()
+        return df.to_html(**kwargs)
+
+    def property_table(self):
+        n_unit = self.unit
+        dn_unit = self.denominator_unit
+        symbol = n_unit.symbol.label if n_unit and n_unit.symbol else ""
+        symbol = symbol + rf"/{dn_unit.symbol.label}" if dn_unit and dn_unit.symbol else symbol
+        n_multiplier = self.multiplier
+        dn_multiplier = self.denominator_multiplier
+        multiplier = n_multiplier.value.label if n_multiplier and n_multiplier.value else ""
+        multiplier = multiplier + rf"/{dn_multiplier.value.label}" \
+            if dn_multiplier and dn_multiplier.value else multiplier
+        multiplier = multiplier.replace(r"/none", "")
+        multiplier = multiplier.replace("none", "1")
+        return pd.DataFrame({"Unit": (symbol,),
+                             "Multiplier": (multiplier,)})
 
 
 class CIMDTProperty(SchemaElement):

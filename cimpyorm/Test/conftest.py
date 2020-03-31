@@ -23,7 +23,7 @@ def acquire_db():
     import cimpyorm.backends
     backend = cimpyorm.backends.SQLite()
     engine = backend.engine
-    session = backend.session
+    session = backend.ORM
     return engine, session
 
 

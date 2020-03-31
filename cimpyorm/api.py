@@ -22,6 +22,7 @@ from tqdm import tqdm
 from cimpyorm.auxiliary import get_logger, get_path, find_rdfs_path
 from cimpyorm.Model.Schema import Schema, CIMClass, CIMEnum, CIMEnumValue
 from cimpyorm.backends import SQLite, Engine
+from cimpyorm.Writer import Serializer
 
 log = get_logger(__name__)
 
@@ -69,7 +70,7 @@ def load(path_to_db: Union[Engine, str],
     else:
         raise FileNotFoundError(f"Unable to connect to database {path_to_db}")
 
-    session = _backend.session
+    session = _backend.ORM
     _backend.reset()
 
     _si = session.query(Source.SourceInfo).first()
@@ -128,7 +129,7 @@ def parse(dataset: Union[str, Path],
         rdfs_path = find_rdfs_path(cim_version)
     else:
         rdfs_path = schema
-    model_schema = Schema(session=session, rdfs_path=rdfs_path)
+    model_schema = Schema(dataset=session, rdfs_path=rdfs_path)
     backend.generate_tables(model_schema)
 
     log.info(f"Parsing data.")
@@ -151,6 +152,21 @@ def parse(dataset: Union[str, Path],
     if log_to_file:
         packagelogger.removeHandler(handler)
     return session, model
+
+
+def create_empty_dataset(version="16",
+                         backend=SQLite):
+    try:
+        backend = backend()
+        backend.drop()
+        backend.reset()
+    except TypeError:
+        pass
+    dataset = backend.ORM
+    rdfs_path = find_rdfs_path(version)
+    schema = Schema(dataset=dataset, rdfs_path=rdfs_path)
+    backend.generate_tables(schema)
+    return dataset, schema.model
 
 
 def create_logfile(dataset, log_to_file):
@@ -266,3 +282,13 @@ def describe(element,
         element.describe(fmt)
     except AttributeError:
         print(f"Element of type {type(element)} doesn't provide descriptions.")
+
+
+def serialize(dataset):
+    """
+
+    :param dataset:
+    :return:
+    """
+    serializer = Serializer(dataset)
+    return serializer.serialize()

@@ -8,16 +8,66 @@
 #  cimpyorm is licensed under the BSD-3-Clause license.
 #  For further information see LICENSE in the project's root directory.
 #
-import os
-from functools import lru_cache
-from typing import Collection, Iterable
-from pathlib import Path
 import configparser
 import logging
-from logging.handlers import RotatingFileHandler
-from zipfile import ZipFile
+import os
+from functools import lru_cache
 from itertools import chain
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from shutil import copytree, copy
+from typing import Collection, Iterable
+from zipfile import ZipFile
+
+import pandas as pd
+from sqlalchemy.orm import Session as SA_Session
+from sqlalchemy import func
+from tabulate import tabulate
+
+
+class Dataset(SA_Session):
+    """
+    The Dataset Class holds the CIM data as well as a reference to the Schema that was used.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.schema = None
+        self.mas = None
+        self.scenario_time = None
+
+    def get_stats(self, fmt="psql"):
+        print("---- CLASSES ----")
+        print(tabulate(self._count_classes(), headers="keys", showindex=False, tablefmt=fmt))
+
+    def _count_classes(self):
+        # Import during call to avoid circular reference
+        from cimpyorm.Model.Elements import CIMClass
+        # Determine Schema roots (e.g IdentifiedObject and so on)
+        roots = [root.class_ for root in
+                 self.query(CIMClass).filter(CIMClass.parent == None).all()]
+        r = [self.query(root.type_, func.count(root.type_)).group_by(
+            root.type_).all() for root in roots]
+        r = chain(*r)
+        df = pd.DataFrame.from_records(r, columns=("Name", "Count"))
+        df = df.append({"Name": " - SUM - ", "Count": df.Count.sum()}, ignore_index=True)
+        del r
+        return df
+
+    def get_objects(self):
+        # Import during call to avoid circular reference
+        from cimpyorm.Model.Elements import CIMClass
+        # Determine Schema roots (e.g IdentifiedObject and so on)
+        roots = [root.class_ for root in
+                 self.query(CIMClass).filter(CIMClass.parent == None).all()]
+        return chain(*(self.query(root).all() for root in roots))
+
+    @property
+    def objects(self):
+        from cimpyorm.Model.Elements import CIMClass
+        # Determine Schema roots (e.g IdentifiedObject and so on)
+        roots = [root.class_ for root in
+                 self.query(CIMClass).filter(CIMClass.parent == None).all()]
+        return sum([self.query(root).count() for root in roots])
 
 
 class HDict(dict):

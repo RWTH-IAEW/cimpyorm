@@ -233,58 +233,38 @@ class CIMClass(SchemaElement):
     def property_table(self):
         table = defaultdict(list)
         for key, prop in self.all_props.items():
-            table["Label"].append(key)
-            table["Domain"].append(prop.domain.name)
-            table["Multiplicity"].append(prop.multiplicity)
+            table["Attribute"].append(key)
+            table["Native"].append(prop.used)
+            table["Defined in"].append(prop.domain.name)
             table["Optional"].append(prop.optional)
+            table["Multiplicity"].append(prop.multiplicity)
             try:
                 table["Datatype"].append(prop.datatype.label)
             except AttributeError:
                 try:
-                    table["Datatype"].append(f"*{prop.range.label}")
+                    table["Datatype"].append(f"{prop.range.label}")
                 except AttributeError:
                     table["Datatype"].append(None)
-            try:
-                nominator_unit = prop.datatype.unit.symbol.label
-                if nominator_unit.lower() == "none":
-                    nominator_unit = None
-            except AttributeError:
-                nominator_unit = None
-            try:
-                denominator_unit = prop.datatype.denominator_unit.symbol.label
-                if denominator_unit.lower() == "none":
-                    denominator_unit = None
-            except AttributeError:
-                denominator_unit = None
-            if nominator_unit and denominator_unit:
-                table["Unit"].append(f"{nominator_unit}/{denominator_unit}")
-            elif nominator_unit:
-                table["Unit"].append(f"{nominator_unit}")
-            elif denominator_unit:
-                table["Unit"].append(f"1/{denominator_unit}")
-            else:
-                table["Unit"].append("-")
 
-            try:
-                nominator_mpl = prop.datatype.multiplier.value.label
-                if nominator_mpl.lower() == "none":
-                    nominator_mpl = None
-            except AttributeError:
-                nominator_mpl = None
-            try:
-                denominator_mpl = prop.datatype.denominator_multiplier.value.label
-                if denominator_mpl.lower() == "none":
-                    denominator_mpl = None
-            except AttributeError:
-                denominator_mpl = None
-            if nominator_mpl and denominator_mpl:
-                table["Multiplier"].append(f"{nominator_mpl}/{denominator_mpl}")
-            elif nominator_mpl:
-                table["Multiplier"].append(f"{nominator_mpl}")
-            elif denominator_mpl:
-                table["Multiplier"].append(f"1/{denominator_mpl}")
-            else:
-                table["Multiplier"].append("-")
-            table["Inferred"].append(not prop.used)
         df = pd.DataFrame(table)
+        # df.style.apply(highlight_columns, cols=["Defined in", "Datatype"])
         return df
+
+    def serialized_properties(self, profile=None):
+        namekeys = {}
+        for name, prop in self.all_props.items():
+            if prop.used:
+                if not prop.range:
+                    namekeys[prop] = name
+                elif isinstance(prop.range, CIMEnum):
+                    namekeys[prop] = f"{name}_name"
+                elif prop.range:
+                    if prop.many_remote:
+                        pass # Fixme
+                    else:
+                        namekeys[prop] = f"{name}_id"
+        return namekeys
+
+
+def highlight_columns(s, cols):
+    return ["color: darkblue" if s.name in cols else "color: darkorange" for v in s.index]

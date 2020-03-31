@@ -57,6 +57,13 @@ class CIMEnum(SchemaElement):
         df = pd.DataFrame(table)
         print(tabulate(df, headers="keys", showindex=False, tablefmt=fmt, stralign="right"))
 
+    def to_html(self, **kwargs):
+        df = self.property_table()
+        return df.to_html(**kwargs)
+
+    def property_table(self):
+        return pd.DataFrame({"Values": [value.label for value in self.values]})
+
 
 class CIMEnumValue(SchemaElement):
     __tablename__ = "CIMEnumValue"

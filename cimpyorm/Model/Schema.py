@@ -19,7 +19,7 @@ import networkx as nx
 from networkx import DiGraph, bfs_tree, dfs_tree
 from networkx.exception import NetworkXNoPath
 from sqlalchemy import Column, TEXT, Integer
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from cimpyorm.auxiliary import log, merge, HDict, merge_descriptions, find_rdfs_path
 import cimpyorm.Model.auxiliary as aux
@@ -30,31 +30,35 @@ from cimpyorm.backends import InMemory
 
 
 class Schema:
-    def __init__(self, session=None, version: str = "16", rdfs_path=None):
+    def __init__(self, dataset=None, version: str = "16", rdfs_path=None):
         """
-        Initialize a Backend object, containing information about the schema elements.
+        Initialize a Schema object, containing information about the schema elements.
         """
         self.g = None
-        if not session:
+        if not dataset:
             backend = InMemory()
             backend.reset()
-            session = backend.session
+            dataset = backend.ORM
         if not rdfs_path:
             rdfs_path = find_rdfs_path(version)
         if not rdfs_path:
             raise FileNotFoundError("Failed to find schema file. Please provide one.")
         tree = merge(rdfs_path)
         log.info(f"Dynamic code generation.")
-        if session.query(SchemaElement).count():
+        try:
+            elements = dataset.query(SchemaElement).count()
+        except OperationalError:
+            elements = None
+        if elements:
             # A schema is already present, so just load it instead of recreating
-            self.session = session
+            self.session = dataset
             self.Element_classes = {c.__name__: c for c in
                                     [CIMPackage, CIMClass, CIMProp, CIMDT, CIMEnum, CIMEnumValue, CIMDTUnit,
                                      CIMDTValue, CIMDTMultiplier, CIMDTDenominatorUnit, CIMDTDenominatorMultiplier]}
-            self.Elements = {c.__name__: {cim_class.name: cim_class for cim_class in session.query(c).all()}
+            self.Elements = {c.__name__: {cim_class.name: cim_class for cim_class in dataset.query(c).all()}
                              for c in self.Element_classes.values()}
         else:
-            self.session = session
+            self.session = dataset
             if isinstance(tree, type(et.ElementTree())):
                 self.file = None
                 self.root = tree.getroot()
@@ -71,14 +75,14 @@ class Schema:
                 self.session.add_all(list(Cat_Elements.values()))
                 self.session.commit()
             log.debug(f"Backend generated")
-            session.add(SchemaInfo(self.root.nsmap))
-            self.init_model(session)
+            dataset.add(SchemaInfo(self.root.nsmap))
+            self.init_model(dataset)
+            dataset.schema = self
 
     @property
     def inheritance_graph(self):
         """
         Determine the class inheritance hierarchy (class definition needs to adhere to strict inheritance hierarchy)
-        :param classes: dict of CIMClass objects
         :return: g - A networkx DiGraph of the class hierarchy, with a common ancestor __root__
         """
         # Determine class inheritance hierarchy (bfs on a directed graph)
@@ -133,6 +137,9 @@ class Schema:
                          **{"enum": Namespace(**{c.name: c for c in self.session.query(
                              CIMEnum).all()})},
                          **{"schema": self})
+
+    def get_classes(self):
+        return {c.name: c.class_ for c in self.session.query(CIMClass).all()}
 
     def _generate(self):
         xp_type_res = XPath(f"rdf:type/@rdf:resource", namespaces=self.root.nsmap)

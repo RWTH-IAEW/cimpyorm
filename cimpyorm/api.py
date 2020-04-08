@@ -74,7 +74,11 @@ def load(path_to_db: Union[Engine, str],
     _backend.reset()
 
     _si = session.query(Source.SourceInfo).first()
-    v = _si.cim_version
+    try:
+        v = _si.cim_version
+    except AttributeError:
+        v = 16
+        log.warning(f"No CIM-version information found in dataset. Defaulting to: CIMv{v}")
     log.info(f"CIM Version {v}")
     schema = Schema.Schema(session)
     schema.init_model(session)

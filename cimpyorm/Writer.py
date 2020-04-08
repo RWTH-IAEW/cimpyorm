@@ -69,13 +69,13 @@ class Serializer:
         fm = et.SubElement(self.root, f"{MD}FullModel",
                            {"{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about": _uuid})
         if self.dataset.mas:
-            et.SubElement(fm, f"{MD}modelingAuthoritySet").text = str(self.dataset.mas)
+            et.SubElement(fm, f"{MD}Model.modelingAuthoritySet").text = str(self.dataset.mas)
         else:
-            et.SubElement(fm, f"{MD}modelingAuthoritySet").text = "CIMPyORM-Export"
+            et.SubElement(fm, f"{MD}Model.modelingAuthoritySet").text = "CIMPyORM-Export"
         if self.dataset.scenario_time:
-            et.SubElement(fm, f"{MD}scenarioTime").text = str(self.dataset.scenario_time)
+            et.SubElement(fm, f"{MD}Model.scenarioTime").text = str(self.dataset.scenario_time)
         NOW = datetime.now().isoformat(timespec="seconds") + "Z"
-        et.SubElement(fm, f"{MD}created").text = NOW
+        et.SubElement(fm, f"{MD}Model.created").text = NOW
 
     def serialize_single_object(self, object):
         """
@@ -138,12 +138,21 @@ class Serializer:
             el = et.SubElement(self.root, f"{{{NAMESPACES[class_.namespace]}}}{class_.label}",
                                {f"{{{NAMESPACES['rdf']}}}ID": f"{id}"})
             for prop, (k, v) in zip(properties.keys(), record.items()):
-                if v:
-                    attrname = f"{{{NAMESPACES[prop.namespace]}}}{class_.name}.{prop.label}"
+                if v is not None:
+                    attrname = f"{{{NAMESPACES[prop.namespace]}}}{prop.domain_name}.{prop.label}"
                     if not prop.range:
-                        et.SubElement(el, attrname).text = str(v)
+                        et.SubElement(el, attrname).text = xml_valid_value(v)
                     elif prop.range:
                         et.SubElement(el, attrname, {f"{{{NAMESPACES['rdf']}}}resource": f"#{v}"})
+
+
+def xml_valid_value(v):
+    if v is True:
+        return "true"
+    elif v is False:
+        return "false"
+    else:
+        return str(v)
 
 
 class DictBundle(Bundle):

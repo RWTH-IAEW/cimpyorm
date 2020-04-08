@@ -234,6 +234,8 @@ class CIMClass(SchemaElement):
         table = defaultdict(list)
         for key, prop in self.all_props.items():
             table["Attribute"].append(key)
+            attrtype = "value" if not prop.range else f"{prop.range.type_} (Ref.)"
+            table["Attribute type"].append(attrtype)
             table["Native"].append(prop.used)
             table["Defined in"].append(prop.domain.name)
             table["Optional"].append(prop.optional)

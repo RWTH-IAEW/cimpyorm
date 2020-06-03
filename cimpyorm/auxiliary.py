@@ -116,21 +116,6 @@ def chunks(l: Collection, n: int) -> Iterable:
 #         raise FileExistsError(r"A schema for this version number already exists")
 
 
-def add_schema(version_number, path):
-    config = configparser.ConfigParser()
-    config.read(get_path("CONFIGPATH"))
-    # assert isinstance(version_number, int)
-    if f"CIM{version_number}" not in os.listdir(config["Paths"]["Schemaroot"]):
-        dst = os.path.join(config["Paths"]["Schemaroot"], f"CIM{version_number}")
-        if os.path.isfile(path):
-            os.makedirs(dst)
-            copy(path, dst)
-        elif os.path.isdir(path):
-            copytree(path, dst)
-    else:
-        raise FileExistsError(r"A schema for this version number already exists")
-
-
 class CustomFormatter(logging.Formatter):
     """
     Elapsed time logging formatter.

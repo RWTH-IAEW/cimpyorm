@@ -22,8 +22,6 @@ from cimpyorm.auxiliary import chunks, get_logger, XPath
 
 log = get_logger(__name__)
 
-log = get_logger(__name__)
-
 
 class CIMClass(ElementMixin, aux.Base):
     """

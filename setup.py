@@ -62,7 +62,8 @@ setup(
         'pytest (>=4.0,<5.0)',
         'pandas (>=0.24.1,<0.25.0)',
         'tabulate (>=0.8.3,<0.9.0)',
-        'tqdm'
+        'tqdm',
+        'defusedxml (<0.7.0)'
     ],  # Optional
     # https://setuptools.readthedocs.io/en/latest/setuptools.html#dependencies-that-aren-t-in-pypi
     dependency_links=[],  # Optional

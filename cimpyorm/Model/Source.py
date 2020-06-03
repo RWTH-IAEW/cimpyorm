@@ -1,12 +1,11 @@
-#
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
 
 import json
@@ -16,7 +15,7 @@ from pathlib import Path
 from typing import Union
 from functools import lru_cache
 
-import lxml.etree as et
+from defusedxml.lxml import parse
 from sqlalchemy import Column, Integer, String, TEXT
 
 from cimpyorm.auxiliary import HDict
@@ -48,7 +47,7 @@ class SourceInfo(aux.Base):
         :return: str
         """
         fm = json.loads(self.FullModel)
-        str_ = f"source uuid: {self.uuid} | filename: {self.filename} | profiles: {fm['profile']}"
+        str_ = f"source uuid: {self.uuid} | filename: {self.filename} | profiles: {fm['profile_name']}"
         return str_
 
     @property
@@ -75,7 +74,7 @@ class SourceInfo(aux.Base):
             self.filename = Path(self.source).name
         except TypeError:
             self.filename = self.source.name
-        self.tree = et.parse(self.source)
+        self.tree = parse(self.source)
         root = self.tree.getroot()
         nsmap = root.nsmap
         uuid, metadata = self._generate_metadata()
@@ -97,7 +96,8 @@ class SourceInfo(aux.Base):
             return None, None
         full_model_id = set(source.xpath("@rdf:about", namespaces=nsmap)) | set(
             source.xpath("@rdf:ID", namespaces=nsmap))
-        assert len(full_model_id) == 1
+        if not len(full_model_id) == 1:
+            raise ValueError("Ambiguous model ID.")
         uuid = list(full_model_id)[0].split("urn:uuid:")[-1]
         metadata = defaultdict(list)
         for element in source:
@@ -111,8 +111,8 @@ class SourceInfo(aux.Base):
 
 def _get_cimrdf_version(cim_ns) -> Union[None, str]:
     """
-    Parse the cim namespace into a version number
-    :param cim_ns: cim namespace
+    Parse the cim namespace_name into a version number
+    :param cim_ns: cim namespace_name
     :return: double, version number, or None if no version could be identified
     """
     match = re.search(r"(?<=CIM-schema-cim)\d{0,2}?(?=#)", cim_ns)

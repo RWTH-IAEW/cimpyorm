@@ -1,3 +1,13 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
+#
+
 import os
 from importlib import reload
 from abc import ABC
@@ -10,6 +20,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from networkx import bfs_tree
 
 # pylint: disable=too-many-arguments
+import cimpyorm.Model.Elements.Datatype
 import cimpyorm.Model.auxiliary as aux
 from cimpyorm.auxiliary import get_logger, Dataset
 
@@ -67,21 +78,27 @@ class Engine(ABC):
         reload(Source)
         reload(Elements)
         reload(Schema)
+        # aux.Base.metadata.create_all(self.engine)
         Source.SourceInfo.metadata.create_all(self.engine)
-        Elements.SchemaElement.metadata.create_all(self.engine)
+        Elements.CIMProfile.metadata.create_all(self.engine)
+        Elements.CIMNamespace.metadata.create_all(self.engine)
+        Elements.CIMClass.metadata.create_all(self.engine)
+        Elements.CIMProp.metadata.create_all(self.engine)
+        Elements.CIMPackage.metadata.create_all(self.engine)
+        Elements.CIMEnum.metadata.create_all(self.engine)
+        Elements.CIMEnumValue.metadata.create_all(self.engine)
+        cimpyorm.Model.Elements.Datatype.CIMDT.metadata.create_all(self.engine)
         Schema.SchemaInfo.metadata.create_all(self.engine)
 
     def generate_tables(self, schema):
-        g = schema.inheritance_graph
+        g, classes = schema.get_inheritance_graph()
         hierarchy = list(bfs_tree(g, "__root__"))
         hierarchy.remove("__root__")
         log.info(f"Creating map prefixes.")
-        for c in hierarchy:
-            c.class_.compile_map(c.nsmap)
         # ToDo: create_all is quite slow, maybe this can be sped up. Currently low priority.
         log.info(f"Creating table metadata.")
-        for child in g["__root__"]:
-            child.class_.metadata.create_all(self.engine)
+        for child_identifier in g["__root__"]:
+            classes[child_identifier].class_.metadata.create_all(self.engine)
         log.info(f"Backend model ready.")
 
 
@@ -226,7 +243,9 @@ class ClientServer(Engine):
 
 
 class MariaDB(ClientServer):
-    def __init__(self, username="root", password="", driver="pymysql",
+    def __init__(self, username="root", password="", driver="pymysql",  # nosec: This is just a client connector with
+                 # an empty default password, so this is a false positive. This package does not (except for its test
+                 # databases) start any database servers related to these values.
                  host="127.0.0.1", port=3306, path="cim", echo=False):
         """
         Default constructor for MariaDB backend instance
@@ -258,7 +277,9 @@ class MariaDB(ClientServer):
 
 
 class MySQL(ClientServer):
-    def __init__(self, username="root", password="", driver="pymysql",
+    def __init__(self, username="root", password="", driver="pymysql",  # nosec: This is just a client connector with
+                 # an empty default password, so this is a false positive. This package does not (except for its test
+                 # databases) start any database servers related to these values.
                  host="127.0.0.1", port=3306, path="cim", echo=False):
         """
         Default constructor for MySQL backend instance

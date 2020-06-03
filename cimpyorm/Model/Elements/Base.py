@@ -1,192 +1,269 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
+#
+
 from typing import Union
+from collections import namedtuple
+from functools import lru_cache
 
-from lxml import etree
-from lxml.etree import XPath
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import Column, String, ForeignKey, ForeignKeyConstraint, JSON
+from sqlalchemy import Table
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declared_attr
 
-from cimpyorm.auxiliary import get_logger
+from cimpyorm.auxiliary import get_logger, merge_results, XPath
 from cimpyorm.Model import auxiliary as aux
 
 log = get_logger(__name__)
+se_type = namedtuple("se_type", ["name", "postpone"], defaults=(False,))
+se_ref = namedtuple("se_ref", ["name", "namespace_name"], defaults=("cim",))
 
 
-def prefix_ns(func):
+mtm_profile_namespace = Table("profile_namespace", aux.Base.metadata,
+                              Column("profile_name", String(80), ForeignKey("CIMProfile.name")),
+                              Column("namespace_name", String(30), ForeignKey(
+                                  "CIMNamespace.short")))
+
+class_used_in = Table("class_profile", aux.Base.metadata,
+                      Column("profile_name", String(80), ForeignKey("CIMProfile.name")),
+                      Column("class_namespace", String(80)),
+                      Column("class_name", String(80)),
+                      ForeignKeyConstraint(("class_namespace", "class_name"),
+                                           ("CIMClass.namespace_name", "CIMClass.name"))
+                      )
+
+prop_used_in = Table("prop_profile", aux.Base.metadata,
+                    Column("profile_name", String(80), ForeignKey("CIMProfile.name")),
+                    Column("prop_namespace", String(80)),
+                    Column("prop_name", String(80)),
+                    Column("prop_cls_namespace", String(80)),
+                    Column("prop_cls_name", String(80)),
+                    ForeignKeyConstraint(("prop_namespace", "prop_name", "prop_cls_namespace",
+                                          "prop_cls_name"),
+                                         ("CIMProp.namespace_name", "CIMProp.name",
+                                          "CIMProp.cls_namespace", "CIMProp.cls_name"))
+                    )
+
+profile_dep_mandatory = Table("profile_dep_mandatory", aux.Base.metadata,
+                              Column("dependant_name", String(80), ForeignKey("CIMProfile.name")),
+                              Column("dependency_name", String(80), ForeignKey("CIMProfile.name"))
+                              )
+
+profile_dep_optional = Table("profile_dep_optional", aux.Base.metadata,
+                             Column("dependant_name", String(80), ForeignKey("CIMProfile.name")),
+                             Column("dependency_name", String(80), ForeignKey("CIMProfile.name"))
+                             )
+
+
+class CIMProfile(aux.Base):
     """
-    Prefixes a property return value with the elements xml-namespace (if its not the default namespace "cim").
+    A CIM Profile instance, usually contained in one file.
 
-    Creates unique labels for properties and classes.
+    This class holds a profile found in a CIM Schema in a SQLAlchemy ORM.
+
+    :param name: The profile's name.
     """
-    def wrapper(obj):
-        """
-        :param obj: Object that implements the namespace property (E.g. CIMClass/CIMProp)
-        :return: Representation with substituted namespace
-        """
-        s = func(obj)
-        res = []
-        if s and isinstance(s, list):
-            for element in s:
-                if element.startswith("#"):
-                    element = "".join(element.split("#")[1:])
-                for key, value in obj.nsmap.items():
-                    if value in element:
-                        if key == "cim":
-                            # Default namespace: cim
-                            element = element.replace(value, "")
-                        else:
-                            element = element.replace(value, key+"_")
-                res.append(element)
-        elif s:
-            if s.startswith("#"):
-                s = "".join(s.split("#")[1:])
-            for key, value in obj.nsmap.items():
-                if value in s:
-                    if key == "cim":
-                        # Default namespace: cim
-                        s = s.replace(value, "")
-                    else:
-                        s = s.replace(value, key + "_")
-            res = s
-        else:
-            res = None
-        return res
-    return wrapper
+    __tablename__ = "CIMProfile"
+    name = Column(String(80), primary_key=True)
+    #: The CIM Properties defined in this profile.
+    properties = relationship("CIMProp", secondary=prop_used_in, backref="allowed_in")
+    #: The CIM Classes used in this profile (not necessarily defined in it).
+    classes = relationship("CIMClass", secondary=class_used_in, backref="used_in")
+    #: The CIM Classes defined in this profile.
+    definitions = {"classes": relationship("CIMClass", backref="defined_in")}
+    #: The CIM Datatypes defined in this profile.
+    datatypes = relationship("CIMDT")
+
+    mandatory_dependencies = relationship("CIMProfile", secondary=profile_dep_mandatory,
+                                          primaryjoin="CIMProfile.name==profile_dep_mandatory.c.dependant_name",
+                                          secondaryjoin="CIMProfile.name==profile_dep_mandatory.c.dependency_name")
+    optional_dependencies = relationship("CIMProfile", secondary=profile_dep_optional,
+                                         primaryjoin="CIMProfile.name==profile_dep_optional.c.dependant_name",
+                                         secondaryjoin="CIMProfile.name==profile_dep_optional.c.dependency_name")
+
+    short = Column(String(10))
+    uri = Column(JSON)
+
+    #: The CIM namespaces contained in this profile.
+    namespaces = relationship(
+        "CIMNamespace", secondary=mtm_profile_namespace, back_populates="profiles"
+    )
+
+    def __init__(self, name: str, uri: str, short: str):
+        self.name: str = name
+        self.uri: str = uri
+        self.short: str = short
 
 
-class SchemaElement(aux.Base):
+class CIMNamespace(aux.Base):
     """
-    ABC for schema entities.
+    A CIM Namespace instance.
+
+    This class holds a namespace found in a CIM Schema in a SQLAlchemy ORM.
+
+    :param short: The namespace's short name.
+
+    :param full_name: The namespace's full URI.
     """
-    __tablename__ = "SchemaElement"
+    __tablename__ = "CIMNamespace"
+    short = Column(String(30), primary_key=True)
+    full_name = Column(String(120))
+
+    #: The CIM profiles that contain this namespace
+    profiles = relationship(
+        "CIMProfile", secondary=mtm_profile_namespace, back_populates="namespaces"
+    )
+
+    def __init__(self, short, full_name):
+        self.short = short
+        self.full_name = full_name
+
+
+class ElementMixin:
+    """
+    Mixin for schema entities.
+
+    This provides common functionality to associate individual SchemaElements (such as classes
+    and properties) with namespaces and profiles. The namespace is read from the XMLS-description of
+    the element, the profile is provided externally.
+
+    :param schema_elements: The XML-Description (an :class:`etree.Element`) defining this ElementMixin.
+
+    :param profile: Profile name the element is defined in.
+    """
+    __tablename__ = "ElementMixin"
+
+    @declared_attr
+    def defined_in(cls):
+        return Column("defined_in", String(80), ForeignKey("CIMProfile.name"))
+
+    @declared_attr.cascading
+    def namespace_name(cls):
+        return Column("namespace_name", String(30), ForeignKey("CIMNamespace.short"),
+                      primary_key=True)
+
+    @declared_attr.cascading
+    def name(cls):
+        return Column("name", String(30), primary_key=True)
+
+    @declared_attr
+    def __table_args__(cls):
+        return (ForeignKeyConstraint(("defined_in",), ("CIMProfile.name",)),
+                ForeignKeyConstraint(("namespace_name",), ("CIMNamespace.short",)))
+
+    @declared_attr
+    def profile(cls):
+        return relationship("CIMProfile")
+
+    @declared_attr
+    def namespace(cls):
+        return relationship("CIMNamespace")
+
     nsmap = None
     XPathMap = None
-    name = Column(String(80), primary_key=True)
-    label = Column(String(50))
-    namespace = Column(String(30))
-    type_ = Column(String(50))
 
-    __mapper_args__ = {
-        "polymorphic_on": type_,
-        "polymorphic_identity": __tablename__
-    }
+    # __columns__ = ("name", "namespace_name")
 
-    def __init__(self, description=None):
-        """
-        The ABC's constructor
-        :param description: the (merged) xml node element containing the class's description
-        """
-        if description is None:
-            log.error(f"Initialisation of CIM model entity without associated "
-                      f"description invalid.")
-            raise ValueError(f"Initialisation of CIM model entity without "
-                             f"associated description invalid.")
-        self.description = description
-        self.Attributes = self._raw_Attributes()
-        self.name = self._name
-        self.label = self._label
-        self.namespace = self._namespace
+    def __init__(self, schema_elements=None):
+        if schema_elements is None:
+            return
+        self.schema_elements = schema_elements
+
+        self.name = self._get_name()
+        self.namespace_name = self._get_namespace()
+
+        # Fixme: Do we really need the packages? They are sometimes ambiguous. Addintional
+        #  many-to-many mappings seem unnecessary
+        # self.package_namespace, self.package_name = self._get_package()
+
         self.Map = None
-
-    @staticmethod
-    def _raw_Attributes():
-        return {"name": None, "label": None, "namespace": None}
 
     @classmethod
     def _generateXPathMap(cls):
         """
-        Generator for compiled XPath expressions (those require a namespace map to be present, hence they are compiled
-        at runtime)
+        Generator for compiled XPath expressions (those require a namespace_name map to be
+        present, hence they are runtime-compiled)
         :return: None
         """
-        cls.XPathMap = {"label": XPath(r"rdfs:label/text()", namespaces=cls.nsmap)}
+        cls.XPathMap = {"category": XPath(r"cims:belongsToCategory/@rdf:resource",
+                                          namespaces=cls.nsmap),
+                        "label": XPath(r"rdfs:label/text()", namespaces=cls.nsmap),
+                        "stereotype_text": XPath(r"cims:stereotype/text()", namespaces=cls.nsmap)}
         return cls.XPathMap
 
-    @property
-    @prefix_ns
-    def _label(self):
-        """
-        Return the class' label
-        :return: str
-        """
-        return self._raw_property("label")
+    def _get_namespace(self) -> Union[str, None]:
+        return self._extract_namespace(self.schema_elements.name)[0]
 
-    @property
-    def full_label(self):
-        if not self.namespace or self.namespace=="cim":
-            return self.label
-        else:
-            return self.namespace+"_"+self.label
-
-    @property
-    def _namespace(self) -> Union[str, None]:
-        if not self.Attributes["namespace"]:
-            if not any(self.name.startswith(ns+"_") for ns in self.nsmap.keys()):
-                self.Attributes["namespace"] = "cim"
-            else:
-                self.Attributes["namespace"] = self.name.split("_")[0]
-        return self.Attributes["namespace"]
-
-    @property
-    def _comment(self):
+    def _get_name(self) -> Union[str, None]:
         """
-        Return the class' label
-        :return: str
-        """
-        # Fixme: This is very slow and not very nice (each string contains the entire xml header - parsing xpath(
-        #  "*/text()) doesn't work due to the text containing xml tags). Therefore, this is currently disabled
-        str_ = "".join(str(etree.tostring(content, pretty_print=True)) for content in self.description.xpath(
-            "rdfs:comment", namespaces=self.nsmap))
-        return str_
-
-    @property
-    @prefix_ns
-    def _name(self) -> Union[str, None]:
-        """
-        Accessor for an entities name (with cache)
         :return: The entities name as defined in its description
         """
-        if self.Attributes["name"]:
-            pass
-        else:
-            _n = self.description.values()[0]
-            self.Attributes["name"] = _n
-        self.name = self.Attributes["name"]
-        return self.Attributes["name"]
+        return self._get_property("label")
 
-    def _raw_property(self, property_identifier) -> Union[list, str, None]:
+    def _get_package(self):
+        """
+        Returns the package name and the packages namespace defined in the description.
+
+        :return: (Package Namespace, Package Name)
+        """
+        package = self._get_property("category")
+        if package:
+            return self._extract_namespace(package)[0], package.lstrip("#")
+        else:
+            return None, None
+
+    @lru_cache()
+    def _get_property(self, name) -> Union[list, str, None]:
         """
         Extract a property from the CIM entity
-        :param property_identifier: property name
+        :param name: property name
         :return: The CIM entity's property as a list, a string, or None
         """
-        if self.Attributes[property_identifier] is None:
-            xp = self.XPathMap
-            if property_identifier not in xp.keys():
-                raise KeyError(f"Invalid property_identifier name {property_identifier}.")
-            results = xp[property_identifier](self.description)  # pylint: disable=unsubscriptable-object
-            if len(set(results)) == 1:
-                self.Attributes[property_identifier] = results[0]
-            elif not results:
-                self.Attributes[property_identifier] = None
-            else:
-                log.warning(f"Ambiguous class property_identifier ({property_identifier}) for {self.name}.")
-                self.Attributes[property_identifier] = [result for result in set(results)]
-        return self.Attributes[property_identifier]
+        xp = self.XPathMap
+        if name not in xp.keys():
+            raise KeyError(f"Invalid name: {name}.")
+        results, _ = self.schema_elements.xpath(xp[name])
+        try:
+            results = merge_results(results)
+            return results
+        except ValueError:
+            log.warning(f"Ambiguous attribute ({name}) for {self.name}.")
+            return [result for result in set(results)]
 
     def describe(self, fmt="psql"):
         print(self)
 
+    @classmethod
+    @lru_cache()
+    def _extract_namespace(cls, name_attribute):
+        ns = None
+        for short, full in cls.nsmap.items():
+            if name_attribute.startswith(full):
+                ns = short
+        ns = "cim" if ns is None else ns
+        remainder = name_attribute.replace(cls.nsmap[ns], "").lstrip("#")
+        return ns, remainder
 
-class CIMPackage(SchemaElement):
+    @property
+    def u_key(self):
+        return se_ref(self.name, self.namespace_name)
+
+
+class CIMPackage(ElementMixin, aux.Base):
     __tablename__ = "CIMPackage"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-
     __mapper_args__ = {
-        "polymorphic_identity": __tablename__
+        "polymorphic_identity": __tablename__,
     }
 
-    def __init__(self, description):
+    def __init__(self, schema_elements=None):
         """
         Class constructor
-        :param description: the (merged) xml node element containing the package's description
+        :param schema_elements: the (merged) xml node element containing the package's description
         """
-        super().__init__(description)
+        super().__init__(schema_elements)

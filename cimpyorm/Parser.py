@@ -1,12 +1,11 @@
-#
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
 
 from itertools import chain
@@ -30,7 +29,7 @@ def get_files(dataset):
 
 def merge_sources(sources):
     d_ = defaultdict(dict)
-    from lxml.etree import XPath
+    from cimpyorm.auxiliary import XPath
     xp = {"id": XPath("@rdf:ID", namespaces=get_nsmap(sources)),
           "about": XPath("@rdf:about", namespaces=get_nsmap(sources))}
     for source in sources:
@@ -52,6 +51,7 @@ def parse_entries(entries, schema, silence_tqdm=False):
         schema.Element_classes["CIMClass"].name,
         schema.Element_classes["CIMClass"]
     ).all())
+    # Fixme: Need to use full_name, otherwise conflicts are dropped silently
     created = []
     for classname, elements in entries.items():
         if classname in classes.keys():
@@ -83,7 +83,7 @@ def determine_uuid(element, xp):
 @lru_cache()
 def get_nsmap(sources: frozenset):
     """
-    Return the merged namespace map for a list of data sources
+    Return the merged namespace_name map for a list of data sources
     :param sources: frozenset of DataSource objects (so its hashable)
     :return: dict, merged nsmap of all DataSource objects
     """

@@ -1,15 +1,14 @@
-#
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
 
-from lxml.etree import XPath
+from cimpyorm.auxiliary import XPath
 
 
 class Parseable:
@@ -28,19 +27,6 @@ class Parseable:
         for prop in self._schema_class.props:
             _str.append(prop.label)
         return r"\n".join(_str)
-
-    @classmethod
-    def compile_map(cls, nsmap):
-        """
-        Compile the XPath map for the parsing run
-        :param nsmap: The .xml nsmap
-        :return: None
-        """
-        attribute_map = cls.Map
-        for key, element in cls.Map.items():
-            if key not in cls.__bases__[0].Map:  # pylint: disable=no-member
-                attribute_map[key] = XPath(element, namespaces=nsmap)
-        cls.Map = attribute_map
 
     @classmethod
     def fields(cls):

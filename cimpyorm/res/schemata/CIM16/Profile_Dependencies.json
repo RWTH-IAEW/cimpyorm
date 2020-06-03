@@ -1,0 +1,56 @@
+{
+  "Profiles": [
+    {
+      "Name": "EquipmentProfile",
+      "short": "EQ"
+    },
+    {
+      "Name": "DiagramLayoutProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "Optional": [
+        "TopologyProfile",
+        "DynamicsProfile"
+      ],
+      "short": "DL"
+    },
+    {
+      "Name": "DynamicsProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "short": "DY"
+    },
+    {
+      "Name": "TopologyProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "short": "TP"
+    },
+    {
+      "Name": "StateVariablesProfile",
+      "Mandatory": [
+        "SteadyStateHypothesisProfile",
+        "TopologyProfile"
+      ],
+      "short": "SV"
+    },
+    {
+      "Name": "SteadyStateHypothesisProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "short": "SSH"
+    },
+    {
+      "Name": "GeographicalLocationProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "Optional": ["EquipmentBoundaryProfile"],
+      "short": "GL"
+    },
+    {
+      "Name": "EquipmentBoundaryProfile",
+      "Mandatory": ["EquipmentProfile"],
+      "short": "EQ_BD"
+    },
+    {
+      "Name": "TopologyBoundaryProfile",
+      "Mandatory": ["EquipmentBoundaryProfile"],
+      "short": "TP_BD"
+    }
+  ]
+}

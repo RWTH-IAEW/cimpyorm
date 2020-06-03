@@ -1,56 +1,74 @@
-from collections import OrderedDict, defaultdict
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
+#
+
+from collections import OrderedDict, defaultdict, Iterable, Sequence
 
 import pandas as pd
-from lxml.etree import XPath
-from sqlalchemy import Column, String, ForeignKey, Integer
+from sqlalchemy import Column, String, ForeignKey, Integer, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from tabulate import tabulate
 
-from cimpyorm.auxiliary import get_logger, shorten_namespace
-from cimpyorm.Model.Elements import SchemaElement, CIMPackage, CIMEnum, prefix_ns
+from cimpyorm.Model.Elements.Base import ElementMixin, CIMPackage
 from cimpyorm.Model.Parseable import Parseable
-from cimpyorm.auxiliary import chunks
+from cimpyorm.Model import auxiliary as aux
+from cimpyorm.auxiliary import chunks, get_logger, XPath
+
+log = get_logger(__name__)
 
 log = get_logger(__name__)
 
 
-class CIMClass(SchemaElement):
+class CIMClass(ElementMixin, aux.Base):
     """
-    Class representing a CIM Model Class
+    A CIM Schema Class (such as Terminal, IdentifiedObject, ...).
+
+    The class definition is read from its XMLS-description.
+
+    :param schema_elements: The XML-Description (an :class:`etree.Element`) defining this CIMClass.
+
+    :param profile: Profile name the element is defined in.
     """
     __tablename__ = "CIMClass"
 
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-    package_name = Column(String(50), ForeignKey(CIMPackage.name))
-    package = relationship(CIMPackage, foreign_keys=package_name, backref="classes")
-    parent_name = Column(String(50), ForeignKey("CIMClass.name"))
-    parent = relationship("CIMClass", foreign_keys=parent_name, backref="children", remote_side=[name])
+    package_name = Column(String(80))
+    package_namespace = Column(String(30))
 
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
+    #: The package that contains this class definition.
+    package = relationship(CIMPackage,
+                           foreign_keys=[package_name, package_namespace],
+                           backref="classes")
+    parent_name = Column(String(80))
+    parent_namespace = Column(String(30))
 
-    def __init__(self, description=None):
+    #: If this class inherits from a parent class, it is referenced here.
+    parent = relationship("CIMClass", foreign_keys=[parent_name, parent_namespace],
+                          backref="children", remote_side="CIMClass.name")
+
+    __table_args__ = (ForeignKeyConstraint(("parent_name", "parent_namespace"),
+                                           ("CIMClass.name", "CIMClass.namespace_name")),
+                      ForeignKeyConstraint((package_name, package_namespace),
+                                           (CIMPackage.name, CIMPackage.namespace_name)),
+                      )
+
+    def __init__(self, schema_elements=None):
         """
         Class constructor
-        :param description: the (merged) xml node element containing the class's description
+        :param schema_elements: the (merged) xml node element containing the class's description
         """
-        super().__init__(description)
-        self.class_ = None
-        self.Attributes = self._raw_Attributes()
-        self.package_name = self._belongsToCategory if not \
-            isinstance(self._belongsToCategory, list) \
-            else self._belongsToCategory[0] # pylint: disable=unsubscriptable-object
-        self.parent_name = self._parent_name
+        super().__init__(schema_elements)
         self.props = []
+        self.class_ = None
+        if schema_elements is None:
+            return
 
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"parent": None,
-                   "category": None,
-                   "namespace": None}
-                }
+        self.parent_namespace, self.parent_name = self._get_parent()
 
     @classmethod
     def _generateXPathMap(cls):
@@ -68,71 +86,55 @@ class CIMClass(SchemaElement):
         else:
             cls.XPathMap = {**cls.XPathMap, **Map}
 
-    @property
-    @prefix_ns
-    def _belongsToCategory(self):
+    def _get_parent(self):
         """
-        Return the class' category as determined from the schema
-        :return: str
-        """
-        return self._raw_property("category")
+        Returns the parent name and the parent namespace defined in the description.
 
-    @property
-    @prefix_ns
-    def _parent_name(self):
+        :return: (Parent namespace, Parent name)
         """
-        Return the class' parent as determined from the schema
-        :return: str
-        """
-        return self._raw_property("parent")
+        parent = self._get_property("parent")
+        if parent:
+            return self._extract_namespace(parent)[0], parent.lstrip("#")
+        else:
+            return None, None
 
     def init_type(self, base):
         """
         Initialize ORM type using the CIMClass object
         :return: None
         """
-        log.debug(f"Initializing class {self.name}.")
+        log.debug(f"Initializing class {self.full_name}.")
         attrs = OrderedDict()
-        attrs["__tablename__"] = self.name
+        attrs["__tablename__"] = self.full_name
         self.Map = dict()
         if self.parent:
-            attrs["id"] = Column(String(50), ForeignKey(f"{self.parent.name}.id",
+            attrs["id"] = Column(String(50), ForeignKey(f"{self.parent.full_name}.id",
                                                         ondelete="CASCADE"), primary_key=True)
-            log.debug(f"Created id column on {self.name} with FK on {self.parent.name}.")
+            log.debug(f"Created id column on {self.full_name} with FK on {self.parent.full_name}.")
             attrs["__mapper_args__"] = {
-                "polymorphic_identity": self.name
+                "polymorphic_identity": self.full_name
             }
-        else: # Base class
+        else:   # Base class
             attrs["type_"] = Column(String(50))
             attrs["_source_id"] = Column(Integer, ForeignKey("SourceInfo.id"))
             attrs["_source"] = relationship("SourceInfo", foreign_keys=attrs["_source_id"])
             attrs["id"] = Column(String(50), primary_key=True)
-            log.debug(f"Created id column on {self.name} with no inheritance.")
+            log.debug(f"Created id column on {self.full_name} with no inheritance.")
             attrs["__mapper_args__"] = {
                 "polymorphic_on": attrs["type_"],
-                "polymorphic_identity": self.name}
+                "polymorphic_identity": self.full_name}
 
         attrs["_schema_class"] = self
 
         if self.parent:
-            self.class_ = type(self.name, (self.parent.class_,), attrs)
+            self.class_ = type(self.full_name, (self.parent.class_,), attrs)
         else: # Base class
-            self.class_ = type(self.name, (Parseable, base,), attrs)
-        log.debug(f"Defined class {self.name}.")
+            self.class_ = type(self.full_name, (Parseable, base,), attrs)
+        log.debug(f"Defined class {self.full_name}.")
 
     def generate(self, nsmap):
         for prop in self.props:
             prop.generate(nsmap)
-
-    def _generate_map(self):
-        """
-        Generate the parse-map so it finds all properties (even those named after the ancestor in the hierarchy)
-        :return: None
-        """
-        # Make sure the CIM Parent Class is always first in __bases__
-        if self.parent:
-            self.Map = {**self.parent._generate_map(), **self.Map}  # pylint: disable=no-member
-        return self.Map
 
     @property
     def prop_keys(self):
@@ -142,19 +144,28 @@ class CIMClass(SchemaElement):
             return [prop.key for prop in self.props]
 
     @property
+    def full_name(self):
+        return self.namespace.short + "_" + self.name
+
+    @property
     def all_props(self):
+        """
+        Return all properties (native and inherited) defined for this CIMClass.
+        """
         _all_props = {}
         for prop in self.props:
-            if prop.namespace is None or prop.namespace == "cim":
-                _all_props[prop.label] = prop
-            else:
-                _all_props[f"{prop.namespace}_{prop.label}"] = prop
+            ns_sensitive_name = prop.name if prop.namespace.short == "cim" \
+                else prop.namespace.short + "_" + prop.name
+            if ns_sensitive_name in _all_props:
+                raise KeyError("Duplicate attribute in hierarchy.")
+            _all_props[ns_sensitive_name] = prop
         if self.parent:
             return {**self.parent.all_props, **_all_props}
         else:
             return _all_props
 
     def parse_values(self, el, session):
+        from cimpyorm.Model.Elements.Enum import CIMEnum
         if not self.parent:
             argmap = {}
             insertables = []
@@ -175,14 +186,14 @@ class CIMClass(SchemaElement):
                 # Insert tuples in chunks of 400 elements max
                 for chunk in chunks(list(zip(_ids, _remote_ids)), 400):
                     _ins = prop.association_table.insert(
-                        [{f"{prop.domain.label}_id": _id,
-                          f"{prop.range.label}_id": _remote_id}
+                        [{f"{prop.cls.full_name}_id": _id,
+                          f"{prop.range.full_name}_id": _remote_id}
                          for (_id, _remote_id) in chunk])
                     insertables.append(_ins)
             elif len(value) == 1 or len(set(value)) == 1:
                 value = value[0]
                 if isinstance(prop.range, CIMEnum):
-                    argmap[prop.key] = shorten_namespace(value, self.nsmap)
+                    prop.insert(argmap, value)
                 else:
                     try:
                         t = prop.mapped_datatype
@@ -234,17 +245,16 @@ class CIMClass(SchemaElement):
         table = defaultdict(list)
         for key, prop in self.all_props.items():
             table["Attribute"].append(key)
-            attrtype = "value" if not prop.range else f"{prop.range.type_} (Ref.)"
-            table["Attribute type"].append(attrtype)
+            table["Attribute type"].append(prop.type)
             table["Native"].append(prop.used)
-            table["Defined in"].append(prop.domain.name)
+            table["Defined in"].append(prop.cls.name)
             table["Optional"].append(prop.optional)
             table["Multiplicity"].append(prop.multiplicity)
             try:
-                table["Datatype"].append(prop.datatype.label)
+                table["Datatype"].append(prop.datatype.name)
             except AttributeError:
                 try:
-                    table["Datatype"].append(f"{prop.range.label}")
+                    table["Datatype"].append(f"{prop.range.name}")
                 except AttributeError:
                     table["Datatype"].append(None)
 
@@ -253,6 +263,7 @@ class CIMClass(SchemaElement):
         return df
 
     def serialized_properties(self, profile=None):
+        from cimpyorm.Model.Elements.Enum import CIMEnum
         namekeys = {}
         for name, prop in self.all_props.items():
             if prop.used:

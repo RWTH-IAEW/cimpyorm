@@ -1,12 +1,11 @@
-#
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
 
 import os
@@ -14,18 +13,24 @@ from pathlib import Path
 import configparser
 from typing import Union, Tuple
 from argparse import Namespace
+from io import BytesIO
+from zipfile import ZipFile
 
 from sqlalchemy.orm.session import Session
 from pandas import DataFrame, pivot_table
 from tqdm import tqdm
+from defusedxml.lxml import tostring
+from lxml.etree import _ElementTree # nosec: Used for typechecking
 
 from cimpyorm.auxiliary import get_logger, get_path, find_rdfs_path
 from cimpyorm.Model.Schema import Schema, CIMClass, CIMEnum, CIMEnumValue
 from cimpyorm.backends import SQLite, Engine
-from cimpyorm.Writer import Serializer
+from cimpyorm.Writer import SingleFileSerializer, MultiFileSerializer
+from cimpyorm.Model.Elements.Base import CIMProfile
 
 log = get_logger(__name__)
 
+log = get_logger(__name__)
 
 def configure(schemata: Union[Path, str] = None,
               datasets: Union[Path, str] = None):
@@ -50,7 +55,7 @@ def load(path_to_db: Union[Engine, str],
          echo: bool = False) -> Tuple[Session, Namespace]:
     """
     Load an already parsed database from disk or connect to a server and yield a database session to start querying on
-    with the classes defined in the model namespace.
+    with the classes defined in the model namespace_name.
 
     Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
     :class:`~argparse.Namespace` return value.
@@ -81,7 +86,7 @@ def load(path_to_db: Union[Engine, str],
         log.warning(f"No CIM-version information found in dataset. Defaulting to: CIMv{v}")
     log.info(f"CIM Version {v}")
     schema = Schema.Schema(session)
-    schema.init_model(session)
+    schema._generate_ORM(session)
     model = schema.model
     return session, model
 
@@ -93,7 +98,7 @@ def parse(dataset: Union[str, Path],
           silence_tqdm: bool = False) -> Tuple[Session, Namespace]:
     """
     Parse a database into a database backend and yield a database session to start querying on with the classes defined
-    in the model namespace.
+    in the model namespace_name.
 
     Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
     :class:`~argparse.Namespace` return value.
@@ -159,7 +164,19 @@ def parse(dataset: Union[str, Path],
 
 
 def create_empty_dataset(version="16",
-                         backend=SQLite):
+                         backend=SQLite,
+                         profile_whitelist=None):
+    """
+    Create an empty dataset to be filled by instantiation of schema-objects.
+
+    :param version: The CIM version to be used.
+    :param backend: The backend to be used.
+    :param profile_whitelist: A list of allowed CIM-profiles. Profiles not contained in this list
+    are not considered for schema generation. If empty or None, all schema elements defined by the
+    CIM schema are generated.
+
+    :return: An empty dataset/session object and the model namespace associated with the CIM schema.
+    """
     try:
         backend = backend()
         backend.drop()
@@ -168,7 +185,7 @@ def create_empty_dataset(version="16",
         pass
     dataset = backend.ORM
     rdfs_path = find_rdfs_path(version)
-    schema = Schema(dataset=dataset, rdfs_path=rdfs_path)
+    schema = Schema(dataset=dataset, rdfs_path=rdfs_path, profile_whitelist=profile_whitelist)
     backend.generate_tables(schema)
     return dataset, schema.model
 
@@ -224,28 +241,28 @@ def lint(session, model):
         for prop in CIM_class.props:
             if not prop.optional and prop.used:
                 total = query.count()
-                objects = query.filter_by(**{prop.full_label: None}).count()
+                objects = query.filter_by(**{prop.name: None}).count()
                 if objects:
-                    events.append({"Class": CIM_class.label,
-                                   "Property": prop.full_label,
+                    events.append({"Class": CIM_class.name,
+                                   "Property": prop.full_name,
                                    "Total": total,
                                    "Type": "Missing",
                                    "Violations": objects,
                                    "Unique": None})
-                    log.debug(f"Missing mandatory property {prop.full_label} for "
-                              f"{objects} instances of type {CIM_class.label}.")
+                    log.debug(f"Missing mandatory property {prop.full_name} for "
+                              f"{objects} instances of type {CIM_class.name}.")
                 if prop.range:
                     try:
                         if isinstance(prop.range, CIMClass):
-                            col = getattr(CIM_class.class_, prop.full_label+"_id")
+                            col = getattr(CIM_class.class_, prop.full_name+"_id")
                             validity = session.query(col).except_(session.query(
                                 prop.range.class_.id))
                         elif isinstance(prop.range, CIMEnum):
-                            col = getattr(CIM_class.class_, prop.full_label + "_name")
+                            col = getattr(CIM_class.class_, prop.full_name + "_get_name")
                             validity = session.query(col).except_(session.query(CIMEnumValue.name))
                     except AttributeError:
-                        log.warning(f"Couldn't determine validity of {prop.full_label} on "
-                                    f"{CIM_class.label}. The linter does not yet support "
+                        log.warning(f"Couldn't determine validity of {prop.full_name} on "
+                                    f"{CIM_class.name}. The linter does not yet support "
                                     f"many-to-many relationships.")
                         # ToDo: Association table errors are currently not caught
                     else:
@@ -254,8 +271,8 @@ def lint(session, model):
                         if count > 1 or (count == 1 and tuple(validity.one())[0] is not None):
                             non_unique = query.filter(col.in_(
                                 val[0] for val in validity.all())).count()
-                            events.append({"Class": CIM_class.label,
-                                           "Property": prop.full_label,
+                            events.append({"Class": CIM_class.name,
+                                           "Property": prop.full_name,
                                            "Total": total,
                                            "Type": "Invalid",
                                            "Violations": non_unique,
@@ -270,7 +287,9 @@ def docker_parse() -> None:
     """
     Dummy function for parsing in shared docker tmp directory.
     """
-    parse(r"/tmp")
+    raise NotImplementedError
+    # Fixme: Reported by bandit as hardcoded_tmp_directory
+    # parse(r"/tmp")
 
 
 def describe(element,
@@ -288,11 +307,57 @@ def describe(element,
         print(f"Element of type {type(element)} doesn't provide descriptions.")
 
 
-def serialize(dataset):
-    """
+def serialize(dataset, mode="Single", profile_whitelist=None):
+    if isinstance(profile_whitelist, str):
+        profile_whitelist = (profile_whitelist,)
+    if not profile_whitelist and not mode == "Single":
+        raise ValueError("Incompatible modes.")
+    if mode == "Single":
+        serializer = SingleFileSerializer(dataset)
+    elif mode == "Multi":
+        serializer = MultiFileSerializer(dataset)
+    else:
+        raise ValueError(f"Unknown serializer mode: {mode}")
+    return serializer.build_tree(profile_whitelist)
 
-    :param dataset:
-    :return:
+
+def export(dataset, mode="Single", profile_whitelist=None):
     """
-    serializer = Serializer(dataset)
-    return serializer.serialize()
+    Returns a XML-serialization of the dataset within a zip-Archive.
+
+    :param dataset: The dataset/SQLAlchemy-Session object to export.
+    :param mode: The export Mode, e.g. Single-File or Split by profiles.
+    :param profile_whitelist: The profiles to export. Mandatory if Export-mode is 'Multi'
+
+    :return: A BytesIO-filehandle containing a zip-archive of the export.
+    """
+    if not mode in ("Multi", "Single"):
+        raise ValueError("Unknown serialization mode ('Single' and 'Multi' are valid values)")
+    trees = serialize(dataset, mode, profile_whitelist)
+    if isinstance(trees, _ElementTree):
+        trees = [trees]
+    file = BytesIO()
+
+    with ZipFile(file, "w") as zf:
+        if not profile_whitelist or mode == "Single":
+            if not len(trees) == 1:
+                raise ValueError("Too many objects returned by serializer.")
+            zf.writestr(
+                f"Export.xml",
+                tostring(trees[0],
+                         encoding="UTF-8",
+                         xml_declaration=True,
+                         pretty_print=True)
+            )
+        else:
+            profile_lib = {p.name: p for p in dataset.query(CIMProfile)}
+            for profile, tree in zip(profile_whitelist, trees):
+                fname = profile_lib[profile].short
+                zf.writestr(
+                    f"{fname}.xml",
+                    tostring(tree,
+                             encoding="UTF-8",
+                             xml_declaration=True,
+                             pretty_print=True)
+                )
+    return file

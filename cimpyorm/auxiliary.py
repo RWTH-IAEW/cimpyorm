@@ -1,13 +1,13 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
-#  Copyright (c) 2018 - 2018 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  cimpyorm is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
-#
+
 import configparser
 import logging
 import os
@@ -18,11 +18,17 @@ from pathlib import Path
 from shutil import copytree, copy
 from typing import Collection, Iterable
 from zipfile import ZipFile
+from argparse import Namespace
 
 import pandas as pd
 from sqlalchemy.orm import Session as SA_Session
 from sqlalchemy import func
 from tabulate import tabulate
+# XPath yields low-severity positives in bandit. The XPath expressions are evaluated on securely parsed
+# (defusedxml)  and not parametrized dynamically. Therefore we ignore these warnings.
+from lxml.etree import XPath    # nosec
+
+DEFAULTS = Namespace(Namespace="")
 
 
 class Dataset(SA_Session):
@@ -44,12 +50,17 @@ class Dataset(SA_Session):
         from cimpyorm.Model.Elements import CIMClass
         # Determine Schema roots (e.g IdentifiedObject and so on)
         roots = [root.class_ for root in
-                 self.query(CIMClass).filter(CIMClass.parent == None).all()]
+                 self.query(CIMClass).filter(
+                     CIMClass.parent_name == None, CIMClass.parent_namespace == None
+                 ).all()]
         r = [self.query(root.type_, func.count(root.type_)).group_by(
             root.type_).all() for root in roots]
         r = chain(*r)
-        df = pd.DataFrame.from_records(r, columns=("Name", "Count"))
-        df = df.append({"Name": " - SUM - ", "Count": df.Count.sum()}, ignore_index=True)
+        r = ((*name.split("_"), count) for name, count in r)
+        df = pd.DataFrame.from_records(r, columns=("Namespace", "Name", "Count"))
+        df = df.append({"Namespace": "---",
+                        "Name": " - SUM - ",
+                        "Count": df.Count.sum()}, ignore_index=True)
         del r
         return df
 
@@ -75,6 +86,10 @@ class HDict(dict):
     def __hash__(self):
         return hash(frozenset(self.items()))
 
+@lru_cache()
+def invert_dict(_d):
+    return {value: key for key, value in _d}
+
 
 def chunks(l: Collection, n: int) -> Iterable:
     """
@@ -85,6 +100,20 @@ def chunks(l: Collection, n: int) -> Iterable:
     """
     for i in range(0, len(l), n):
         yield l[i:i+n]
+
+#
+# def add_schema(version_number, path):
+#     config = configparser.ConfigParser()
+#     config.read(get_path("CONFIGPATH"))
+#     if f"CIM{version_number}" not in os.listdir(config["Paths"]["Schemaroot"]):
+#         dst = os.path.join(config["Paths"]["Schemaroot"], f"CIM{version_number}")
+#         if os.path.isfile(path):
+#             os.makedirs(dst)
+#             copy(path, dst)
+#         elif os.path.isdir(path):
+#             copytree(path, dst)
+#     else:
+#         raise FileExistsError(r"A schema for this version number already exists")
 
 
 def add_schema(version_number, path):
@@ -148,11 +177,12 @@ CONFIG = configparser.ConfigParser()
 # Set default paths
 CONFIG["Paths"] = {"PACKAGEROOT": Path(os.path.abspath(__file__)).parent,
                    "TESTROOT": os.path.join(Path(os.path.abspath(__file__)).parent, "Test"),
-                   "CONFIGPATH": os.path.join(Path(os.path.abspath(__file__)).parent, "config.ini")}
-
-_TESTROOT = CONFIG["Paths"]["TESTROOT"]
-_PACKAGEROOT = CONFIG["Paths"]["PACKAGEROOT"]
-_CONFIGPATH = CONFIG["Paths"]["CONFIGPATH"]
+                   "CONFIGPATH": os.path.join(Path(os.path.abspath(__file__)).parent,
+                                              "config.ini"),
+                   "SCHEMAROOT": os.path.join(Path(os.path.abspath(__file__)).parent,
+                                              "res", "schemata"),
+                   "DATASETROOT": os.path.join(Path(os.path.abspath(__file__)).parent,
+                                               "res", "datasets")}
 
 
 def get_path(identifier: str) -> str:
@@ -161,34 +191,32 @@ def get_path(identifier: str) -> str:
     :param identifier: Path-type identifier.
     :return:
     """
-    config = configparser.ConfigParser()
-    config.read(_CONFIGPATH)
-    return config["Paths"][identifier]
+    return CONFIG["Paths"][identifier]
 
 
-def merge(source_path):
-    """
-    Merges several ElementTrees into one.
-
-    :return: Merged Elementtree
-    """
-    from lxml import etree as et
-    path = source_path
-    files = parseable_files(path)
-    base = et.parse(files[0])
-    root = base.getroot()
-    nsmap = root.nsmap
-    for file in files[1:]:
-        tree = et.parse(file)
-        for key, value in tree.getroot().nsmap.items():
-            if key in nsmap and value != nsmap[key]:
-                log.error("Incompatible namespaces in schema files")
-            nsmap[key] = value
-        for child in tree.getroot():
-            root.append(child)
-    tree = et.ElementTree(root)
-    et.cleanup_namespaces(tree, top_nsmap=nsmap, keep_ns_prefixes=nsmap.keys())
-    return tree
+# def merge(source_path):
+#     """
+#     Merges several ElementTrees into one.
+#
+#     :return: Merged Elementtree
+#     """
+#     from lxml import etree as et
+#     path = source_path
+#     files = parseable_files(path)
+#     base = et.parse(files[0])
+#     root = base.getroot()
+#     nsmap = root.nsmap
+#     for file in files[1:]:
+#         tree = et.parse(file)
+#         for key, value in tree.getroot().nsmap.items():
+#             if key in nsmap and value != nsmap[key]:
+#                 log.error("Incompatible namespaces in schema files")
+#             nsmap[key] = value
+#         for child in tree.getroot():
+#             root.append(child)
+#     tree = et.ElementTree(root)
+#     et.cleanup_namespaces(tree, top_nsmap=nsmap, keep_ns_prefixes=nsmap.keys())
+#     return tree
 
 
 def parseable_files(path):
@@ -216,6 +244,20 @@ def parseable_files(path):
             files = [dir_.open(name) for name in dir_.namelist() if name.endswith(
                 ".xml") or name.endswith(".rdf")]
     return files
+
+
+def apply_xpath(expr, descriptions):
+    by_profile = {profile: expr(values) for profile, values in descriptions.items()}
+    return list(chain(*(v for v in by_profile.values()))), by_profile
+
+
+def merge_results(results):
+    if len(set(results)) == 1:
+        return next(iter(results))
+    elif not results:
+        return None
+    else:
+        raise ValueError
 
 
 @lru_cache()

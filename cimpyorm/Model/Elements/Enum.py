@@ -1,36 +1,35 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
+#
+
 from collections import defaultdict
+from typing import Union
 
 import pandas as pd
-from lxml.etree import XPath
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import Column, String, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from tabulate import tabulate
 
-from cimpyorm.Model.Elements import SchemaElement, prefix_ns
+from cimpyorm.Model.Elements.Base import ElementMixin, se_ref
+from cimpyorm.Model import auxiliary as aux
+from cimpyorm.auxiliary import XPath
 
 
-class CIMEnum(SchemaElement):
+class CIMEnum(ElementMixin, aux.Base):
     __tablename__ = "CIMEnum"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
 
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
-
-    def __init__(self, description):
+    def __init__(self, schema_elements=None):
         """
         Class constructor
-        :param description: the (merged) xml node element containing the enums's description
+        :param schema_elements: the (merged) xml node element containing the enums's description
         """
-        super().__init__(description)
-        self.Attributes = self._raw_Attributes()
-
-
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"category": None}}
-
+        super().__init__(schema_elements)
 
     @classmethod
     def _generateXPathMap(cls):
@@ -41,14 +40,16 @@ class CIMEnum(SchemaElement):
         else:
             cls.XPathMap = {**cls.XPathMap, **Map}
 
-    @property
-    @prefix_ns
-    def _category(self):
-        """
-        Return the enums' category as determined from the schema
-        :return: str
-        """
-        return self._raw_property("category")
+    def _get_namespace(self) -> Union[str, None]:
+        stereotyped_namespace = self._get_property("stereotype_text")
+        if stereotyped_namespace and stereotyped_namespace == "Entsoe":
+            # Fixme: This is hardcoded as the "Entsoe" stereotype determines the namespace for
+            #  some properties. However, the same attribute is sometimes used to denote the CIM
+            #  Package (e.g. ShortCircuit) which should not be misinterpreted as a namespace.
+            return "entsoe"
+        else:
+            # Determine from name
+            return self._extract_namespace(self.schema_elements.name)[0]
 
     def describe(self, fmt="psql"):
         table = defaultdict(list)
@@ -65,29 +66,25 @@ class CIMEnum(SchemaElement):
         return pd.DataFrame({"Values": [value.label for value in self.values]})
 
 
-class CIMEnumValue(SchemaElement):
+class CIMEnumValue(ElementMixin, aux.Base):
     __tablename__ = "CIMEnumValue"
-    name = Column(String(80), ForeignKey(SchemaElement.name), primary_key=True)
-    enum_name = Column(String(50), ForeignKey(CIMEnum.name))
+    enum_name = Column(String(80), primary_key=True)
+    enum_namespace = Column(String(30), primary_key=True)
     enum = relationship(CIMEnum, foreign_keys=enum_name, backref="values")
 
-    __mapper_args__ = {
-        "polymorphic_identity": __tablename__
-    }
+    fqn = Column(String(120))
+    __table_args__ = (ForeignKeyConstraint((enum_name,
+                                            enum_namespace),
+                                           (CIMEnum.name,
+                                            CIMEnum.namespace_name)),)
 
-    def __init__(self, description):
+    def __init__(self, schema_elements=None):
         """
         Class constructor
-        :param description: the (merged) xml node element containing the enums's description
+        :param schema_elements: the (merged) xml node element containing the enums's description
         """
-        super().__init__(description)
-        self.Attributes = self._raw_Attributes()
-        self.enum_name = self._enum_name
-
-    @staticmethod
-    def _raw_Attributes():
-        return {**SchemaElement._raw_Attributes(),
-                **{"type": None}}
+        super().__init__(schema_elements)
+        self.enum_namespace, self.enum_name = self._get_enum()
 
     @classmethod
     def _generateXPathMap(cls):
@@ -98,11 +95,17 @@ class CIMEnumValue(SchemaElement):
         else:
             cls.XPathMap = {**cls.XPathMap, **Map}
 
-    @property
-    @prefix_ns
-    def _enum_name(self):
+    def _get_enum(self):
         """
         Return the enums' category as determined from the schema
         :return: str
         """
-        return self._raw_property("type")
+        domain = self._get_property("type")
+        ns, domain = self._extract_namespace(domain)
+        return ns, domain
+
+    @property
+    def u_key(self):
+        r = (se_ref(self.name, self.namespace_name),
+             se_ref(self.enum_name, self.enum_namespace))
+        return r

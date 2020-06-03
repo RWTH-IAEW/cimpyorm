@@ -4,6 +4,7 @@ services:
 
 stages:
 - build
+- verify
 - test:unit
 - test:integration
 - deploy:build
@@ -32,24 +33,41 @@ build:
     - docker push $CONTAINER_TEST_IMAGE
     - docker push $CACHE_IMAGE
 
-.unit:
+.test:
   tags:
     - docker
-  stage: test:unit
   image: $CONTAINER_TEST_IMAGE
   except:
     - Releases
 
 pytest:
-  extends: .unit
+  extends: .test
+  stage: test:unit
   script:
-    - pytest --ignore=cimpyorm/Test/Integration --ignore=cimpyorm/Test/Deployment --cov
+    - pytest --ignore=cimpyorm/Test/Integration --ignore=cimpyorm/Test/Deployment --junitxml=pytest.xml --cov
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+  artifacts:
+    when: always
+    reports:
+      junit: pytest.xml
 
 pylint:
-  extends: .unit
+  extends: .test
+  stage: verify
   script:
     - ./pylint.sh
+
+bandit:
+  extends: .test
+  stage: verify
+  allow_failure: true
+  script:
+    - pip install bandit
+    - bandit -r cimpyorm -f html -o report.html
+  artifacts:
+    when: always
+    expose_as: "Bandit"
+    paths: [report.html]
 
 .integration:
   tags:
@@ -59,22 +77,6 @@ pylint:
   retry: 1
   except: 
     - Releases
-
-integration:MariaDB:
-  extends: .integration
-  services:
-    - name: mariadb
-      alias: localhost
-  script:
-    - pytest --maxfail=1 cimpyorm/Test/Integration/MariaDB
-
-integration:MySQL:
-  extends: .integration
-  services:
-    - name: mysql
-      alias: localhost
-  script:
-    - pytest --maxfail=1 cimpyorm/Test/Integration/MySQL
 
 integration:SQLite:
   extends: .integration

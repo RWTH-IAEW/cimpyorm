@@ -1,13 +1,13 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
 #
-#  Copyright (c) 2018 - 2019 Thomas Offergeld (offergeld@ifht.rwth-aachen.de)
-#  Institute for High Voltage Technology
-#  RWTH Aachen University
-#
-#  This module is part of cimpyorm.
-#
-#  CIMPy is licensed under the BSD-3-Clause license.
-#  For further information see LICENSE in the project's root directory.
-#
+
 import os
 
 import click
@@ -38,7 +38,7 @@ def cli():
 def load(path_to_db, echo=False):
     """
     Load an already parsed database from disk or connect to a server and yield a database session to start querying on
-    with the classes defined in the model namespace.
+    with the classes defined in the model namespace_name.
 
     Afterwards, the database can be queried using SQLAlchemy query syntax, providing the CIM classes contained in the
     :class:`~argparse.Namespace` return value.

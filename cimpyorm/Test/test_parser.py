@@ -1,8 +1,19 @@
+#   Copyright (c) 2018 - 2020 Institute for High Voltage Technology and Institute for High Voltage Equipment and Grids, Digitalization and Power Economics
+#   RWTH Aachen University
+#   Contact: Thomas Offergeld (t.offergeld@iaew.rwth-aachen.de)
+#  #
+#   This module is part of CIMPyORM.
+#  #
+#   CIMPyORM is licensed under the BSD-3-Clause license.
+#   For further information see LICENSE in the project's root directory.
+#
+
 import pytest
 
+from defusedxml.lxml import fromstring
 
 def test_single_object(cgmes_schema):
-    import lxml.etree as et
+
     ACL = cgmes_schema.model.classes.ACLineSegment
     literal = '<?xml version="1.0" encoding="UTF-8"?>' \
         '<rdf:RDF  xmlns:cim="http://iec.ch/TC57/2013/CIM-schema-cim16#" xmlns:entsoe="http://entsoe.eu/CIM/SchemaExtension/3/1#" xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' \
@@ -45,7 +56,7 @@ def test_single_object(cgmes_schema):
             'r0': 6.6,
             'shortCircuitEndTemperature': 160.0,
             'x0': 204.6}
-    assert ACL.parse_values(et.fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[0] == map
+    assert ACL.parse_values(fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[0] == map
 
 
 one_node = \
@@ -109,11 +120,10 @@ multi_node = \
 
 @pytest.mark.parametrize("literal", [one_node, multi_node], ids=["single_property_node", "multiple_property_nodes"])
 def test_m2m_rel(cgmes_schema, literal):
-    import lxml.etree as et
     TI = cgmes_schema.model.classes.TopologicalIsland
-    insertable = TI.parse_values(et.fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[1][0]
+    insertable = TI.parse_values(fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[1][0]
     values = insertable.parameters
-    assert "TopologicalIsland_id" in values[0].keys()
-    assert "TopologicalNode_id" in values[0].keys()
-    assert "_f6ee76f7-3d28-6740-aa78-f0bf7176cdad" in [value["TopologicalNode_id"] for value in values]
+    assert "cim_TopologicalIsland_id" in values[0].keys()
+    assert "cim_TopologicalNode_id" in values[0].keys()
+    assert "_f6ee76f7-3d28-6740-aa78-f0bf7176cdad" in [value["cim_TopologicalNode_id"] for value in values]
     assert len(values) == 20

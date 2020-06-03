@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cimpyorm"
-version = "0.8.1"
+version = "0.8.2"
 description = "A database-backed ORM for CIM datasets."
 authors = ["Thomas Offergeld <offergeld@ifht.rwth-aachen.de>"]
 homepage = "http://www.ifht.rwth-aachen.de"
@@ -31,6 +31,7 @@ tabulate = "^0.8.3"
 tqdm = "^4.31"
 openpyxl = "^2.6"
 click = "^7.0"
+defusedxml = "0.6.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^4.0"

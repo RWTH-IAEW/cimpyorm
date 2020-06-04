@@ -30,7 +30,6 @@ from cimpyorm.Model.Elements.Base import CIMProfile
 
 log = get_logger(__name__)
 
-log = get_logger(__name__)
 
 def configure(schemata: Union[Path, str] = None,
               datasets: Union[Path, str] = None):
@@ -307,7 +306,21 @@ def describe(element,
         print(f"Element of type {type(element)} doesn't provide descriptions.")
 
 
-def serialize(dataset, mode="Single", profile_whitelist=None):
+def serialize(dataset, mode="Single", profile_whitelist=None, header_data=None):
+    """
+    Serialize the dataset according to the options given by the parameters and the data loaded in
+        the dataset.
+
+    :param dataset: The dataset/SQLAlchemy-Session object to export.
+    :param mode: The export Mode, e.g. Single-File or Split by profiles.
+    :param profile_whitelist: The profiles to export. Mandatory if Export-mode is 'Multi'
+    :param header_data: Additional information for creating the file-headers (FullModel Objects).
+        This is a dictionary of CIM-header supplements. Currently only the 'profile_header'
+        field is supported, in which a list of profile identifiers (e.g.
+        'http://entsoe.eu/CIM/Topology/4/1') are defined.
+
+    :return: A serialization of the model (or a list thereof if mode='Multi')
+    """
     if isinstance(profile_whitelist, str):
         profile_whitelist = (profile_whitelist,)
     if not profile_whitelist and not mode == "Single":
@@ -318,22 +331,26 @@ def serialize(dataset, mode="Single", profile_whitelist=None):
         serializer = MultiFileSerializer(dataset)
     else:
         raise ValueError(f"Unknown serializer mode: {mode}")
-    return serializer.build_tree(profile_whitelist)
+    return serializer.build_tree(profile_whitelist, header_data=header_data)
 
 
-def export(dataset, mode="Single", profile_whitelist=None):
+def export(dataset, mode="Single", profile_whitelist=None, header_data=None):
     """
     Returns a XML-serialization of the dataset within a zip-Archive.
 
     :param dataset: The dataset/SQLAlchemy-Session object to export.
     :param mode: The export Mode, e.g. Single-File or Split by profiles.
     :param profile_whitelist: The profiles to export. Mandatory if Export-mode is 'Multi'
+    :param header_data: Additional information for creating the file-headers (FullModel Objects).
+        This is a dictionary of CIM-header supplements. Currently only the 'profile_header'
+        field is supported, in which a list of profile identifiers (e.g.
+        'http://entsoe.eu/CIM/Topology/4/1') are defined.
 
     :return: A BytesIO-filehandle containing a zip-archive of the export.
     """
     if not mode in ("Multi", "Single"):
         raise ValueError("Unknown serialization mode ('Single' and 'Multi' are valid values)")
-    trees = serialize(dataset, mode, profile_whitelist)
+    trees = serialize(dataset, mode, profile_whitelist, header_data)
     if isinstance(trees, _ElementTree):
         trees = [trees]
     file = BytesIO()

@@ -89,7 +89,8 @@ except ModuleNotFoundError:
 #     CONFIG.write(f)
 
 try:
-    from cimpyorm.api import parse, load, describe, stats, lint  # pylint: disable=wrong-import-position
+    from cimpyorm.api import parse, load, describe, stats, lint, create_empty_dataset, \
+        export  # pylint: disable=wrong-import-position
     from cimpyorm.Model.Schema import Schema  # pylint: disable=wrong-import-position
     from cimpyorm import datasets
 except ModuleNotFoundError:

@@ -75,8 +75,8 @@ bandit:
   image: $CONTAINER_TEST_IMAGE
   stage: test:integration
   retry: 1
-  except: 
-    - Releases
+  only:
+    - Dev
 
 integration:SQLite:
   extends: .integration

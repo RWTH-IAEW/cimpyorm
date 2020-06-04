@@ -18,6 +18,7 @@ from itertools import chain
 # entities are deserialized, this should generally be secure.
 from lxml.etree import Element, SubElement, ElementTree     # nosec
 from sqlalchemy.orm import Bundle
+from sqlalchemy import or_
 from tqdm import tqdm
 
 from cimpyorm.Model.Elements.Enum import CIMEnum
@@ -53,7 +54,7 @@ class Serializer:
     def build_tree(self, profiles=None):
         raise NotImplementedError
 
-    def serialize_fullmodel_object(self, profiles=None, uuids=None):
+    def serialize_fullmodel_object(self, profiles=None, uuids=None, header_data=None):
         """
         Generate the FullModel Object contained in the object-tree and add it to the root
         """
@@ -63,10 +64,11 @@ class Serializer:
         if not profiles:
             profiles = self.dataset.query(CIMProfile)
         else:
-            profiles = self.dataset.query(CIMProfile).filter(CIMProfile.name.in_(profiles))
+            profiles = self.dataset.query(CIMProfile).filter(or_(CIMProfile.name.in_(profiles),
+                                                                 CIMProfile.short.in_(profiles)))
 
         uris = (loads(profile.uri).values() for profile in profiles)
-        uris = chain(*uris)
+        uris = list(chain(*uris))
 
         MD = "{http://iec.ch/TC57/61970-552/ModelDescription/1#}"
         if not uuids:
@@ -86,8 +88,24 @@ class Serializer:
             SubElement(fm, f"{MD}Model.modelingAuthoritySet").text = "CIMPyORM-Export"
         if self.dataset.scenario_time:
             SubElement(fm, f"{MD}Model.scenarioTime").text = str(self.dataset.scenario_time)
-        for uri in uris:
-            SubElement(fm, f"{MD}Model.profile").text = str(uri)
+        if header_data and "profile_header" in header_data:
+            if not isinstance(header_data["profile_header"], (list, tuple)):
+                raise ValueError("Invalid structure for profile_header.")
+            else:
+                no_profile_in_header = True
+                for _p in header_data["profile_header"]:
+                    if _p in uris:
+                        SubElement(fm, f"{MD}Model.profile").text = str(_p)
+                        no_profile_in_header = False
+                    else:
+                        log.debug(f"Profile header '{str(_p)}' not defined in profiles URIs.")
+                if no_profile_in_header:
+                    log.warning(f"No profile defined in file header for file containing "
+                                f"{[profile.short for profile in profiles]} due to manual "
+                                f"profile_header filter selection.")
+        else:
+            for uri in uris:
+                SubElement(fm, f"{MD}Model.profile").text = str(uri)
         if uuids:
             for profile in profiles:
                 for dep in profile.mandatory_dependencies:
@@ -220,7 +238,7 @@ class Serializer:
 
 class SingleFileSerializer(Serializer):
 
-    def build_tree(self, profiles=None, uuids=None):
+    def build_tree(self, profiles=None, uuids=None, header_data=None):
         """
         Serialize the dataset.
 
@@ -234,7 +252,7 @@ class SingleFileSerializer(Serializer):
         """
         if isinstance(profiles, str):
             profiles = (profiles,)
-        self.serialize_fullmodel_object(profiles, uuids)
+        self.serialize_fullmodel_object(profiles, uuids, header_data)
         if profiles:
             classes = self.dataset.query(CIMClass).join(CIMProfile,
                                                         CIMClass.used_in).filter(
@@ -254,7 +272,7 @@ class SingleFileSerializer(Serializer):
 
 class MultiFileSerializer(Serializer):
 
-    def build_tree(self, profiles=None):
+    def build_tree(self, profiles=None, header_data=None):
         """
         Serialize the dataset.
 
@@ -263,8 +281,11 @@ class MultiFileSerializer(Serializer):
         if not profiles:
             raise ValueError("The MultiFileSerializer needs a list of profiles to split the "
                              "dataset.")
-        uuids = {profile: str(uuid.uuid4()) for profile in profiles}
-        forest = [SingleFileSerializer(self.dataset).build_tree(profiles=profile, uuids=uuids)
+        profile_db = self.dataset.query(CIMProfile).filter(or_(CIMProfile.name.in_(profiles),
+                                                               CIMProfile.short.in_(profiles)))
+        uuids = {profile.name: str(uuid.uuid4()) for profile in profile_db}
+        forest = [SingleFileSerializer(self.dataset).build_tree(profiles=profile, uuids=uuids,
+                                                                header_data=header_data)
                   for profile in profiles]
         return forest
 

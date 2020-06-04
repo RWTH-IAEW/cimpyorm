@@ -48,7 +48,6 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],  # Optional
     packages=find_packages(exclude=[
-        'cimpyorm/config.ini',
         'cimpyorm/Test/Deployment/**',
         '**/.pytest_cache/**',
     ]),  # Required

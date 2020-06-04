@@ -39,6 +39,7 @@ def test_serialization_multi():
                          xml_declaration=True,
                          pretty_print=True)
             )
+    s.close()
 
 
 def test_serialization_attributes():
@@ -49,3 +50,53 @@ def test_serialization_attributes():
     _io = export(s, "Single")
     teststr = b'<cim:Terminal rdf:ID="21">\n    <cim:IdentifiedObject.name>someothername</cim:IdentifiedObject.name>\n    <cim:Terminal.phases rdf:resource="http://iec.ch/TC57/2013/CIM-schema-cim16#PhaseCode.ABC"/>\n  </cim:Terminal>'
     assert teststr in _io.getvalue()
+    s.close()
+
+
+def test_manual_profile_header():
+    s, m = create_empty_dataset(version="16", profile_whitelist=["EQ", "TP", "SSH"])
+    terminals = (m.Terminal(id=42, name="somename", phases=m.enum.PhaseCode.v.AB),
+                 m.Terminal(id=21, name="someothername", phases=m.enum.PhaseCode.v.ABC))
+    s.add_all(terminals)
+    header = {"profile_header":
+                  ("http://entsoe.eu/CIM/EquipmentCore/3/1",
+                   "http://entsoe.eu/CIM/EquipmentOperation/3/1")}
+    tree = serialize(s, mode="Single", header_data=header)
+    _str = tostring(tree)
+    assert b"http://entsoe.eu/CIM/EquipmentCore/3/1" in _str
+    assert b"http://entsoe.eu/CIM/EquipmentOperation/3/1" in _str
+    assert b"http://entsoe.eu/CIM/EquipmentShortCircuit/3/1" not in _str
+    s.close()
+
+
+def test_invalid_manual_profile_header():
+    s, m = create_empty_dataset(version="16", profile_whitelist=["EQ", "TP", "SSH"])
+    terminals = (m.Terminal(id=42, name="somename", phases=m.enum.PhaseCode.v.AB),
+                 m.Terminal(id=21, name="someothername", phases=m.enum.PhaseCode.v.ABC))
+    s.add_all(terminals)
+    header = {"profile_header":
+                  ("http://entsoe.eu/CIM/EquipmentCore/3/1",
+                   "http://entsoe.eu/CIM/StateVariables/4/1",)}
+    tree = serialize(s, mode="Single", header_data=header)
+    _str = tostring(tree)
+    assert b"http://entsoe.eu/CIM/EquipmentCore/3/1" in _str
+    assert b"http://entsoe.eu/CIM/StateVariables/4/1" not in _str
+    s.close()
+
+
+def test_multi_file_manual_profile_header():
+    s, m = create_empty_dataset(version="16", profile_whitelist=["EQ", "TP", "SSH"])
+    terminals = (m.Terminal(id=42, name="somename", phases=m.enum.PhaseCode.v.AB),
+                 m.Terminal(id=21, name="someothername", phases=m.enum.PhaseCode.v.ABC))
+    s.add_all(terminals)
+    header = {"profile_header":
+                  ("http://entsoe.eu/CIM/EquipmentCore/3/1",
+                   "http://entsoe.eu/CIM/Topology/4/1",)}
+    trees = serialize(s, mode="Multi", header_data=header, profile_whitelist=["EQ", "TP", "SSH"])
+    _str = [tostring(tree) for tree in trees]
+    assert b"http://entsoe.eu/CIM/EquipmentCore/3/1" in _str[0]
+    assert b"http://entsoe.eu/CIM/Topology/4/1" in _str[1]
+    assert b"http://entsoe.eu/CIM/StateVariables/4/1" not in _str[0]
+    assert b"http://entsoe.eu/CIM/StateVariables/4/1" not in _str[1]
+    assert b"http://entsoe.eu/CIM/StateVariables/4/1" not in _str[2]
+    s.close()

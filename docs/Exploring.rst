@@ -14,7 +14,8 @@ For the CIM class ACLineSegment::
     s, m = load(r"path_to_db")
     describe(m.ACLineSegment)
 
-the following description is printed:
+the following description is printed (the layout and information displayed has changed a bit over
+the months):
 
 ===================  =============================
           Hierarchy    Number of native properties
@@ -58,3 +59,9 @@ ConductingEquipment                              3
 shortCircuitEndTemperature        ACLineSegment            1..1       False           Temperature    degC             -       False
                         x0        ACLineSegment            1..1       False             Reactance     ohm             -       False
 ==========================  ===================  ==============  ==========  ====================  ======  ============  ==========
+
+**************************
+CIM-Explorer
+**************************
+In addition the schema model for the CGMES v2.4.15 is provided `by a related project
+<https://cimflaskexplorer.herokuapp.com/>`_.

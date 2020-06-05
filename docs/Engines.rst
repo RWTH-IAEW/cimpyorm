@@ -1,18 +1,15 @@
 ==============
 Engines
 ==============
+
+.. warning::
+    This page is partially outdated as of 06/2020. Proceed with care.
+
 The parser can use several database backend engines that serve as wrappers around SQLAlchemy Engines and sessionmakers.
 
 ********************
 Common functionality
 ********************
-
-All Engines provide SQLAlchemy ``session`` and ``engine`` objects as properties:
-
-.. autofunction:: cimpyorm.backends.Engine.engine
-
-.. autofunction:: cimpyorm.backends.Engine.session
-
 
 ********************
 Database engines

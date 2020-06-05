@@ -13,12 +13,12 @@ The CIM Elements are organized in profiles and namespaces:
 SchemaElements
 **************
 
-All elements described in a CIM Schema inherit from a common mixin (SchemaElement), that provides
+All elements described in a CIM Schema inherit from a common mixin (ElementMixin), that provides
 some common functionality, such as relationships to
 :py:class:`~cimpyorm.Model.Elements.Base.CIMProfile` and
 :py:class:`~cimpyorm.Model.Elements.Base.CIMNamespace` objects.
 
-.. autoclass:: cimpyorm.Model.Elements.Base.SchemaElement
+.. autoclass:: cimpyorm.Model.Elements.Base.ElementMixin
 
     .. py:attribute:: profile
 

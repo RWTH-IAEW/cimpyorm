@@ -30,6 +30,7 @@ from cimpyorm.Model.Elements.Base import CIMProfile
 
 log = get_logger(__name__)
 
+log = get_logger(__name__)
 
 def configure(schemata: Union[Path, str] = None,
               datasets: Union[Path, str] = None):
@@ -40,6 +41,8 @@ def configure(schemata: Union[Path, str] = None,
 
     :param datasets: Path to a folder containing test datasets.
     """
+    raise DeprecationWarning("Configuration of schema resources has been deprecated. Please get in "
+                             "touch if you rely on this functionality.")
     config = configparser.ConfigParser()
     config.read(get_path("CONFIGPATH"))
     if schemata:
@@ -105,7 +108,7 @@ def parse(dataset: Union[str, Path],
     :param dataset: Path to the cim snapshot.
     :param backend: Database backend to be used (defaults to a SQLite on-disk database in the dataset location).
     :param schema: Location of the RDF schema to be used to parse the dataset (Folder of multiple RDF schemata or a
-    single schema file).
+        single schema file).
     :param log_to_file: Pass logging output to a file for this ingest only.
     :param silence_tqdm: Silence tqdm progress bars
 
@@ -171,8 +174,8 @@ def create_empty_dataset(version="16",
     :param version: The CIM version to be used.
     :param backend: The backend to be used.
     :param profile_whitelist: A list of allowed CIM-profiles. Profiles not contained in this list
-    are not considered for schema generation. If empty or None, all schema elements defined by the
-    CIM schema are generated.
+        are not considered for schema generation. If empty or None, all schema elements defined by
+        the CIM schema are generated.
 
     :return: An empty dataset/session object and the model namespace associated with the CIM schema.
     """
@@ -286,7 +289,8 @@ def docker_parse() -> None:
     """
     Dummy function for parsing in shared docker tmp directory.
     """
-    raise NotImplementedError
+    raise DeprecationWarning("Par. Please get in "
+                             "touch if you rely on this functionality.")
     # Fixme: Reported by bandit as hardcoded_tmp_directory
     # parse(r"/tmp")
 
@@ -334,13 +338,16 @@ def serialize(dataset, mode="Single", profile_whitelist=None, header_data=None):
     return serializer.build_tree(profile_whitelist, header_data=header_data)
 
 
-def export(dataset, mode="Single", profile_whitelist=None, header_data=None):
+def export(dataset, mode: str = "Single",
+           profile_whitelist: Union[list, tuple] = None,
+           header_data: dict = None):
     """
     Returns a XML-serialization of the dataset within a zip-Archive.
 
     :param dataset: The dataset/SQLAlchemy-Session object to export.
-    :param mode: The export Mode, e.g. Single-File or Split by profiles.
-    :param profile_whitelist: The profiles to export. Mandatory if Export-mode is 'Multi'
+    :param mode: {'Single', 'Multi'} - The export Mode, e.g. Single-File or Split by profiles.
+    :param profile_whitelist: The profiles to export. Mandatory if Export-mode is 'Multi'.
+        Profiles can be specificed by their full name (e.g. 'EquipmentProfile' or their short name 'EQ')
     :param header_data: Additional information for creating the file-headers (FullModel Objects).
         This is a dictionary of CIM-header supplements. Currently only the 'profile_header'
         field is supported, in which a list of profile identifiers (e.g.

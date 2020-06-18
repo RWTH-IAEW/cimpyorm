@@ -210,9 +210,9 @@ def parseable_files(path):
     :param path: path to the directory
     :return: list of files
     """
-    if path.endswith(".rdf") or path.endswith(".xml"):
+    if not isinstance(path, Path) and (path.endswith(".rdf") or path.endswith(".xml")):
         files = [path]
-    elif path.endswith(".zip"):
+    elif not isinstance(path, Path) and path.endswith(".zip"):
         dir_ = ZipFile(path, "r")
         files = [dir_.open(name) for name in dir_.namelist() if name.endswith(
             ".xml") or name.endswith(".rdf")]

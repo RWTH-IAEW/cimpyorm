@@ -144,7 +144,7 @@ def parse(dataset: Union[str, Path],
     backend.generate_tables(model_schema)
 
     log.info(f"Parsing data.")
-    entries = Parser.merge_sources(sources)
+    entries = Parser.merge_sources(sources, model_schema)
     elements = Parser.parse_entries(entries, model_schema, silence_tqdm=silence_tqdm)
     log.info(f"Passing {len(elements):,} objects to database.")
     session.bulk_save_objects(elements)

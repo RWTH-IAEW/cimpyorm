@@ -27,8 +27,21 @@ def get_files(dataset):
     return files
 
 
-def merge_sources(sources):
-    d_ = defaultdict(dict)
+def merge_sources(sources, model_schema=None):
+    """
+    Merge different sources of CIM datasets (usually the different profiles, but could also be
+    multiple instances of the same profile when multiple datasets are merged via boundary datasets)
+
+    :param sources: SourceInfo objects of the source files.
+    :param model_schema: The schema used to deserialize the dataset.
+
+    :return: A dictionary of the objects found in the dataset, keyed by classname and object uuid.
+    """
+    uuid2name = dict()
+    uuid2data = dict()
+
+    classname_list = defaultdict(set)
+
     from cimpyorm.auxiliary import XPath
     xp = {"id": XPath("@rdf:ID", namespaces=get_nsmap(sources)),
           "about": XPath("@rdf:about", namespaces=get_nsmap(sources))}
@@ -37,12 +50,52 @@ def merge_sources(sources):
             try:
                 uuid = determine_uuid(element, xp)
                 classname = shorten_namespace(element.tag, HDict(get_nsmap(sources)))
-                if classname not in d_ or uuid not in d_[classname].keys():
-                    d_[classname][uuid] = element
+
+                # Set the classname only when UUID is attribute
+                try:
+                    uuid = xp["id"](element)[0]
+                    if uuid in uuid2name and uuid2name[uuid] != classname:
+                        # If multiple objects of different class share the same uuid, raise an Error
+                        raise ReferenceError(f"uuid {uuid}={classname} already defined as {uuid2name[uuid]}")
+
+                    uuid2name[uuid] = classname
+                except IndexError:
+                    pass
+
+                classname_list[uuid] |= {classname}
+
+                if uuid not in uuid2data:
+                    uuid2data[uuid] = element
                 else:
-                    [d_[classname][uuid].append(sub) for sub in element]  # pylint: disable=expression-not-assigned
+                    [uuid2data[uuid].append(sub) for sub in element]  # pylint: disable=expression-not-assigned
             except ValueError:
                 log.warning(f"Skipped element during merge: {element}.")
+
+    # print warning in case uuid references use different classnames
+    for uuid, name_set in classname_list.items():
+        if len(name_set) > 1:
+            log.warning(f"Ambiguous classnames for {uuid} of type {uuid2name.get(uuid, None)} = {name_set}")
+
+    # check that the class is the most specific one in the list
+    if model_schema is not None:
+        schema_classes = model_schema.get_classes()
+        for uuid, classname in uuid2name.items():
+            try:
+                cls = schema_classes[classname]
+            except KeyError:
+                log.info(f"Class {classname} is not included in schema. Objects of this class are not deserialized.")
+            else:
+                try:
+                    if not all(issubclass(cls, schema_classes[_cname]) for _cname in classname_list[uuid]):
+                        raise ValueError(f"Class {classname} is not most specific of {classname_list[uuid]}.")
+                except KeyError as ex:
+                    raise ReferenceError(f"Malformed schema. Class-hierarchy-element is missing: {ex}.")
+
+    # transform the data into output structure
+    d_ = defaultdict(dict)
+    for uuid, classname in uuid2name.items():
+        d_[classname][uuid] = uuid2data[uuid]
+
     return d_
 
 

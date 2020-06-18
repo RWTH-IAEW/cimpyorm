@@ -9,11 +9,16 @@
 #
 
 import pytest
+from importlib.resources import path
+
+from defusedxml.lxml import fromstring
+
+from cimpyorm import parse, backends
+from cimpyorm.Test import test_datasets
 
 from defusedxml.lxml import fromstring
 
 def test_single_object(cgmes_schema):
-
     ACL = cgmes_schema.model.classes.ACLineSegment
     literal = '<?xml version="1.0" encoding="UTF-8"?>' \
         '<rdf:RDF  xmlns:cim="http://iec.ch/TC57/2013/CIM-schema-cim16#" xmlns:entsoe="http://entsoe.eu/CIM/SchemaExtension/3/1#" xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' \
@@ -57,6 +62,49 @@ def test_single_object(cgmes_schema):
             'shortCircuitEndTemperature': 160.0,
             'x0': 204.6}
     assert ACL.parse_values(fromstring(literal.encode("UTF-8"))[0], cgmes_schema.session)[0] == map
+
+
+def assert_complete_basic_terminal_element(s, m):
+    t = s.query(m.Terminal).one()
+    assert t.phases == m.enum.PhaseCode.v.ABC
+    assert t.sequenceNumber == 1
+    assert t.ConductingEquipment_id == "_1e7f52a9-21d0-4ebe-9a8a-b29281d5bfc9" # The object
+    # doesn't exist, so t.ConductingEquipment is None
+    assert t.name == "L5_0"
+
+    # The other attributes are added by extension profiles (TP and SSH), so if these fail
+    # something is wrong with the object-merge
+    assert t.TopologicalNode_id == "_37edd845-456f-4c3e-98d5-19af0c1cef1e"
+    assert t.connected == True
+    s.close()
+
+
+def test_merge_across_profiles():
+    with path(test_datasets, "basic_mergeable_dataset") as dataset:
+        s, m = parse(dataset, backend=backends.InMemory)
+        assert_complete_basic_terminal_element(s, m)
+
+
+def test_merge_w_inconsistent_classnames():
+    with path(test_datasets, "mergeable_dataset_w_inconsistent_class_definitions") as dataset:
+        s, m = parse(dataset, backend=backends.InMemory)
+        assert_complete_basic_terminal_element(s, m)
+
+
+def test_reverse_order_uuid_usage():
+    # In this testcase the merge order of the id- and about-object references is changed. This
+    # should not be a problem
+    with path(test_datasets, "basic_reverse_order_merge") as dataset:
+        s, m = parse(dataset, backend=backends.InMemory)
+        assert_complete_basic_terminal_element(s, m)
+
+
+def test_too_generic_object_declaration():
+    # In this testcase the merge order of the id- and about-object references is changed. This
+    # should not be a problem
+    with pytest.raises(ValueError):
+        with path(test_datasets, "terminal_declaration_too_generic") as dataset:
+            s, m = parse(dataset, backend=backends.InMemory)
 
 
 one_node = \

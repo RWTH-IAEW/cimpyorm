@@ -1,7 +1,3 @@
-image: docker:git
-services:
-- docker:dind
-
 stages:
 - build
 - verify
@@ -10,6 +6,7 @@ stages:
 - deploy:build
 - deploy:check
 - deploy:upload
+- deploy:doc
 - doc
 
 variables:
@@ -24,6 +21,7 @@ variables:
   PYPI_PASSWORD: $PYPI_PASSWORD
 
 build:
+  # Build an image with all requirements installed to use in later stages
   tags:
     - linux
   stage: build
@@ -40,24 +38,15 @@ build:
   except:
     - Releases
 
-pytest:
-  extends: .test
-  stage: test:unit
-  script:
-    - pytest --ignore=cimpyorm/Test/Integration --ignore=cimpyorm/Test/Deployment --junitxml=pytest.xml --cov
-  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
-  artifacts:
-    when: always
-    reports:
-      junit: pytest.xml
-
 pylint:
+  # Run a static code style checker (pylint)
   extends: .test
   stage: verify
   script:
     - ./pylint.sh
 
 bandit:
+  # Run a static vulnerability checker (Bandit)
   extends: .test
   stage: verify
   allow_failure: true
@@ -69,38 +58,45 @@ bandit:
     expose_as: "Bandit"
     paths: [report.html]
 
+pytest:
+  # Run unit tests, skipping some more special test cases (Integration, Deployment)
+  extends: .test
+  image: python:${PY_VERSION}
+  stage: test:unit
+  script:
+    - pip install -r requirements.txt
+    - pip install -r dev-requirements.txt
+    - pytest --ignore=cimpyorm/Test/Integration --ignore=cimpyorm/Test/Deployment --junitxml=pytest.xml --cov
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+  needs: ["build"]
+  artifacts:
+    when: always
+    reports:
+      junit: pytest.xml
+  parallel:
+    matrix:
+      - PY_VERSION: ["3.7", "3.8"]
+        DUMMY: "0"
+
 .integration:
+  # Anchor for integration tests - retried once (sometimes services don't startup properly) and
+  # only run on Dev branch
   tags:
     - docker
   image: $CONTAINER_TEST_IMAGE
   stage: test:integration
+  needs: ["build"]
   retry: 1
   only:
     - Dev
 
 integration:SQLite:
+  # Test with SQLite Backend
   extends: .integration
   script:
     - pytest --maxfail=1 cimpyorm/Test/Integration/SQLite
 
-pages:
-  stage: doc
-  only:
-    - Releases
-  tags:
-    - docker
-  image: $CONTAINER_TEST_IMAGE
-  script:
-    - cd docs
-    - make html
-    - cd ..
-    - mkdir public
-    - mv docs/_build/html/* public
-  artifacts:
-    paths:
-    - public
-
-.deploy_common:
+.deploy:
   only:
     - Releases
   tags:
@@ -108,18 +104,18 @@ pages:
   image: python
 
 build_dist:
-  extends: .deploy_common
+  extends: .deploy
   stage: deploy:build
   script:
-    - pip install poetry
-    - poetry build
+    - pip install --upgrade setuptools wheel
+    - python setup.py sdist bdist_wheel
   artifacts:
-    when: on_success
-    expire_in: 1 week
     paths:
-      - dist
+      - dist/
+
 
 check:
+  # Show contents of build archive (for manual inspection)
   only:
     - Releases
   tags:
@@ -132,15 +128,43 @@ check:
   dependencies:
     - build_dist
 
-upload:
-  extends: .deploy_common
+release:pypi:
+  # Release on pypi using twine and the variable-defined credentials
+  extends: .deploy
   stage: deploy:upload
+  needs: ["build_dist"]
   when: manual
   allow_failure: true
   script:
-    - pip install -q twine toml requests pytest
+    - pip install -q twine toml requests pytest pandas
     - twine upload --repository-url $PYPI_ENDPOINT --u $PYPI_USER --p $PYPI_PASSWORD dist/*
     - sleep 20
     - pytest cimpyorm/Test/Deployment
   dependencies:
     - build_dist
+    
+release:gitlab:
+  extends: .deploy
+  stage: deploy:upload
+  needs: ["build_dist"]
+  when: manual
+  script:
+    - pip install -q twine
+    - TWINE_PASSWORD=${GITLAB_PACKAGE_KEY} TWINE_USERNAME=package-token python -m twine upload --verbose --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+
+doc:
+  # Create PDF documentation
+  tags:
+    - docker
+  image: $CI_REGISTRY/iaew/docker/python-texlive:3.7
+  stage: deploy:doc
+  script:
+    - pip install sphinx sphinx-autodoc-typehints sphinx_rtd_theme
+    - sphinx-build -b latex docs/ Documentation
+    - cd Documentation && make
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - Documentation/cimpyorm.pdf
+  needs: []

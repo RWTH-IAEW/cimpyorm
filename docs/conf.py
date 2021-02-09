@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('/app/'))
 # -- Project information -----------------------------------------------------
 
 project = 'CIMPyORM'
-copyright = '2018-2019 IfHT at RWTH Aachen University, 2019-2020 IAEW at RWTH Aachen University'
+copyright = '2018-2019 IfHT at RWTH Aachen University, 2019-2021 IAEW at RWTH Aachen University'
 author = 'Thomas Offergeld'
 
 try:

@@ -16,6 +16,9 @@ from defusedxml.lxml import fromstring
 from cimpyorm import parse, backends
 from cimpyorm.Test import test_datasets
 
+from cimpyorm import parse, backends
+from cimpyorm.Test import test_datasets
+
 from defusedxml.lxml import fromstring
 
 def test_single_object(cgmes_schema):

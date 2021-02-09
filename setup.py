@@ -27,14 +27,14 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.8.4',  # Required
+    version='0.9.0',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
     long_description=long_description,  # Optional
     # https://packaging.python.org/specifications/core-metadata/#description-content-type-optional
     long_description_content_type='text/markdown',  # Optional (see note above)
-    url="http://www.ifht.rwth-aachen.de",  # Optional
+    url="http://www.iaew.rwth-aachen.de",  # Optional
     author="Thomas Offergeld",  # Optional
     author_email="t.offergeld@iaew.rwth-aachen.de",  # Optional
     # For a list of valid classifiers, see https://pypi.org/classifiers/
@@ -44,8 +44,8 @@ setup(
         'License :: OSI Approved :: BSD License', 'Natural Language :: English',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7'
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8'
     ],  # Optional
     packages=find_packages(exclude=[
         'cimpyorm/Test/Deployment/**',
@@ -54,13 +54,12 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'Click',
-        'sqlalchemy (>=1.2,<2.0)',
-        'networkx (>=2.2,<3.0)',
-        'numpy (>=1.15,<2.0)',
-        'lxml (>=4.2,<5.0)',
-        'pytest (>=4.0,<5.0)',
-        'pandas (>=0.24.1,<0.25.0)',
-        'tabulate (>=0.8.3,<0.9.0)',
+        'sqlalchemy',
+        'networkx',
+        'numpy',
+        'lxml',
+        'pandas',
+        'tabulate',
         'tqdm',
         'defusedxml (<0.7.0)'
     ],  # Optional
@@ -71,7 +70,7 @@ setup(
     include_package_data=True,
     # https://packaging.python.org/specifications/core-metadata/#project-url-multiple-use
     project_urls={  # Optional
-        'homepage': 'http://www.ifht.rwth-aachen.de',
+        'homepage': 'http://www.iaew.rwth-aachen.de',
     },
     entry_points='''
     [console_scripts]

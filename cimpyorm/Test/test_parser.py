@@ -10,11 +10,15 @@
 
 import pytest
 from importlib.resources import path
+import os
+import inspect
 
 from defusedxml.lxml import fromstring
 
 from cimpyorm import parse, backends
 from cimpyorm.Test import test_datasets
+
+p_test_datasets = os.path.dirname(inspect.getfile(test_datasets))
 
 
 def test_single_object(cgmes_schema):
@@ -79,23 +83,23 @@ def assert_complete_basic_terminal_element(s, m):
 
 
 def test_merge_across_profiles():
-    with path(test_datasets, "basic_mergeable_dataset") as dataset:
-        s, m = parse(dataset, backend=backends.InMemory)
-        assert_complete_basic_terminal_element(s, m)
+    dataset = os.path.join(p_test_datasets, "basic_mergeable_dataset")
+    s, m = parse(dataset, backend=backends.InMemory)
+    assert_complete_basic_terminal_element(s, m)
 
 
 def test_merge_w_inconsistent_classnames():
-    with path(test_datasets, "mergeable_dataset_w_inconsistent_class_definitions") as dataset:
-        s, m = parse(dataset, backend=backends.InMemory)
-        assert_complete_basic_terminal_element(s, m)
+    dataset = os.path.join(p_test_datasets, "mergeable_dataset_w_inconsistent_class_definitions")
+    s, m = parse(dataset, backend=backends.InMemory)
+    assert_complete_basic_terminal_element(s, m)
 
 
 def test_reverse_order_uuid_usage():
     # In this testcase the merge order of the id- and about-object references is changed. This
     # should not be a problem
-    with path(test_datasets, "basic_reverse_order_merge") as dataset:
-        s, m = parse(dataset, backend=backends.InMemory)
-        assert_complete_basic_terminal_element(s, m)
+    dataset = os.path.join(p_test_datasets, "basic_reverse_order_merge")
+    s, m = parse(dataset, backend=backends.InMemory)
+    assert_complete_basic_terminal_element(s, m)
 
 
 def test_too_generic_object_declaration():

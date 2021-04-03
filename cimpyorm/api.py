@@ -30,7 +30,6 @@ from cimpyorm.Model.Elements.Base import CIMProfile
 
 log = get_logger(__name__)
 
-log = get_logger(__name__)
 
 def configure(schemata: Union[Path, str] = None,
               datasets: Union[Path, str] = None):
@@ -295,8 +294,7 @@ def docker_parse() -> None:
     # parse(r"/tmp")
 
 
-def describe(element,
-             fmt: str = "psql") -> None:
+def describe(element, fmt: str = "psql") -> None:
     """
     Give a description of an object.
 

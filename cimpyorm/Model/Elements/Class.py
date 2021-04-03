@@ -257,7 +257,6 @@ class CIMClass(ElementMixin, aux.Base):
                     table["Datatype"].append(None)
 
         df = pd.DataFrame(table)
-        # df.style.apply(highlight_columns, cols=["Defined in", "Datatype"])
         return df
 
     def serialized_properties(self, profile=None):

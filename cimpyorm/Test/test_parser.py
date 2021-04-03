@@ -106,8 +106,8 @@ def test_too_generic_object_declaration():
     # In this testcase the merge order of the id- and about-object references is changed. This
     # should not be a problem
     with pytest.raises(ValueError):
-        with path(test_datasets, "terminal_declaration_too_generic") as dataset:
-            s, m = parse(dataset, backend=backends.InMemory)
+        dataset = os.path.join(p_test_datasets, "terminal_declaration_too_generic")
+        s, m = parse(dataset, backend=backends.InMemory)
 
 
 one_node = \

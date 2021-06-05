@@ -12,7 +12,7 @@ from collections import OrderedDict
 from typing import Union
 from string import ascii_letters, digits
 
-from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table, ForeignKeyConstraint
+from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table, ForeignKeyConstraint, Index
 from sqlalchemy.orm import relationship
 
 from cimpyorm.auxiliary import get_logger, shorten_namespace, XPath
@@ -57,6 +57,8 @@ class CIMProp(ElementMixin, aux.Base):
     inverse_class_namespace = Column(String(30))
     #: The inverse property associated with this property (None if the property is a Primitive or
     #: an EnumValue)
+
+
     inverse = relationship("CIMProp",
                            foreign_keys=[inverse_property_name,
                            inverse_property_namespace, inverse_class_name,
@@ -71,17 +73,18 @@ class CIMProp(ElementMixin, aux.Base):
     type = "Generic"
 
     __table_args__ = (ForeignKeyConstraint((cls_name, cls_namespace),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
                       ForeignKeyConstraint((datatype_name, datatype_namespace),
-                                           (CIMDT.name,
-                                            CIMDT.namespace_name)),
-                      ForeignKeyConstraint(("inverse_property_name",
-                           "inverse_property_namespace", "inverse_class_name",
-                           "inverse_class_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
+                                           (CIMDT.namespace_name,
+                                            CIMDT.name)),
+                      ForeignKeyConstraint(("inverse_class_name",
+                                            "inverse_class_namespace",
+                                            "inverse_property_namespace",
+                                            "inverse_property_name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
                       )
 
     __mapper_args__ = {
@@ -377,11 +380,10 @@ class CIMProp_AlphaNumeric(CIMProp):
 
     type = "Alphanumeric"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
+    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
                       ForeignKeyConstraint(("cls_name", "cls_namespace"),
                                            (CIMClass.name,
                                             CIMClass.namespace_name)),
@@ -410,11 +412,10 @@ class CIMProp_Reference(CIMProp):
 
     type = "Reference"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
+    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
                       ForeignKeyConstraint(("cls_name", "cls_namespace"),
                                            (CIMClass.name,
                                             CIMClass.namespace_name)),
@@ -446,11 +447,10 @@ class CIMProp_Enumeration(CIMProp):
 
     type = "Enumeration"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
+    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
                       ForeignKeyConstraint(("cls_name", "cls_namespace"),
                                            (CIMClass.name,
                                             CIMClass.namespace_name)),

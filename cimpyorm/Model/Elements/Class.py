@@ -8,10 +8,10 @@
 #   For further information see LICENSE in the project's root directory.
 #
 
-from collections import OrderedDict, defaultdict, Iterable, Sequence
+from collections import OrderedDict, defaultdict
 
 import pandas as pd
-from sqlalchemy import Column, String, ForeignKey, Integer, ForeignKeyConstraint, Index
+from sqlalchemy import Column, String, ForeignKey, Integer, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from tabulate import tabulate
 
@@ -44,7 +44,6 @@ class CIMClass(ElementMixin, aux.Base):
                            backref="classes")
     parent_name = Column(String(80))
     parent_namespace = Column(String(30))
-    comp_idx_cls = Index("comp_idx_cls", "name", "namespace_name")
 
     #: If this class inherits from a parent class, it is referenced here.
     parent = relationship("CIMClass", foreign_keys=[parent_namespace, parent_name],

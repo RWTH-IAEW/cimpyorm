@@ -13,7 +13,7 @@ from collections import namedtuple
 from functools import lru_cache
 
 from sqlalchemy import Column, String, ForeignKey, ForeignKeyConstraint, JSON
-from sqlalchemy import Table, Index
+from sqlalchemy import Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
 

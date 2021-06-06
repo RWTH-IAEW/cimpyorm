@@ -8,7 +8,7 @@
 #   For further information see LICENSE in the project's root directory.
 #
 
-from sqlalchemy import Column, String, ForeignKeyConstraint, Index
+from sqlalchemy import Column, String, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 
 from cimpyorm.Model import auxiliary as aux
@@ -28,7 +28,7 @@ class CIMDT(ElementMixin, aux.Base):
     package_name = Column(String(80))
     package_namespace = Column(String(30))
     package = relationship(CIMPackage,
-                           foreign_keys=[package_name, package_namespace],
+                           foreign_keys=[package_namespace, package_name],
                            backref="datatypes")
 
     nominator_unit = Column(String(30))
@@ -39,13 +39,10 @@ class CIMDT(ElementMixin, aux.Base):
 
     base_datatype = Column(String(80))
     
-    comp_idx = Index("comp_idx", "name", "namespace_name")
-
     stereotype = Column(String(30))
-    __table_args__ = (Index("comp_idx", "name", "namespace_name"),
-                      ForeignKeyConstraint((package_name, package_namespace),
-                                           (CIMPackage.name,
-                                            CIMPackage.namespace_name)),
+    __table_args__ = (ForeignKeyConstraint((package_namespace, package_name),
+                                           (CIMPackage.namespace_name,
+                                            CIMPackage.name)),
                       ForeignKeyConstraint(("defined_in",), ("CIMProfile.name",)),
                       ForeignKeyConstraint(("namespace_name",), ("CIMNamespace.short",))
                       )

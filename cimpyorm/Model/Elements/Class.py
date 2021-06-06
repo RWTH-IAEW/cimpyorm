@@ -44,14 +44,13 @@ class CIMClass(ElementMixin, aux.Base):
                            backref="classes")
     parent_name = Column(String(80))
     parent_namespace = Column(String(30))
-    comp_idx = Index("comp_idx", "name", "namespace_name")
+    comp_idx_cls = Index("comp_idx_cls", "name", "namespace_name")
 
     #: If this class inherits from a parent class, it is referenced here.
     parent = relationship("CIMClass", foreign_keys=[parent_namespace, parent_name],
                           backref="children", remote_side="CIMClass.name")
 
-    __table_args__ = (Index("comp_idx", "name", "namespace_name"),
-                      ForeignKeyConstraint(("parent_namespace", "parent_name"),
+    __table_args__ = (ForeignKeyConstraint(("parent_namespace", "parent_name"),
                                            ("CIMClass.namespace_name", "CIMClass.name")),
                       ForeignKeyConstraint((package_namespace, package_name),
                                            (CIMPackage.namespace_name, CIMPackage.name)),

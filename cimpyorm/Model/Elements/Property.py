@@ -12,7 +12,7 @@ from collections import OrderedDict
 from typing import Union
 from string import ascii_letters, digits
 
-from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table, ForeignKeyConstraint, Index
+from sqlalchemy import Column, String, ForeignKey, Boolean, Float, Integer, Table, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 
 from cimpyorm.auxiliary import get_logger, shorten_namespace, XPath
@@ -72,10 +72,10 @@ class CIMProp(ElementMixin, aux.Base):
 
     type = "Generic"
 
-    __table_args__ = (ForeignKeyConstraint((cls_name, cls_namespace),
+    __table_args__ = (ForeignKeyConstraint((cls_namespace, cls_name),
                                            (CIMClass.namespace_name,
                                             CIMClass.name)),
-                      ForeignKeyConstraint((datatype_name, datatype_namespace),
+                      ForeignKeyConstraint((datatype_namespace, datatype_name),
                                            (CIMDT.namespace_name,
                                             CIMDT.name)),
                       ForeignKeyConstraint(("inverse_class_name",
@@ -380,13 +380,13 @@ class CIMProp_AlphaNumeric(CIMProp):
 
     type = "Alphanumeric"
 
-    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+    __table_args__ = (ForeignKeyConstraint(("cls_name", "cls_namespace", "namespace_name", "name"),
                                            ("CIMProp.cls_name",
                                             "CIMProp.cls_namespace", "CIMProp.namespace_name",
                                             "CIMProp.name")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -416,12 +416,12 @@ class CIMProp_Reference(CIMProp):
                                            ("CIMProp.cls_name",
                                             "CIMProp.cls_namespace", "CIMProp.namespace_name",
                                             "CIMProp.name")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
-                      ForeignKeyConstraint((range_name, range_namespace),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
+                      ForeignKeyConstraint((range_namespace, range_name),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -451,12 +451,12 @@ class CIMProp_Enumeration(CIMProp):
                                            ("CIMProp.cls_name",
                                             "CIMProp.cls_namespace", "CIMProp.namespace_name",
                                             "CIMProp.name")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
-                      ForeignKeyConstraint((range_name, range_namespace),
-                                           (CIMEnum.name,
-                                            CIMEnum.namespace_name)),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
+                      ForeignKeyConstraint((range_namespace, range_name),
+                                           (CIMEnum.namespace_name,
+                                            CIMEnum.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__

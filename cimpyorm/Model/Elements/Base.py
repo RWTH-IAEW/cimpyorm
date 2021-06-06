@@ -153,8 +153,7 @@ class ElementMixin:
 
     @declared_attr
     def __table_args__(cls):
-        return (Index("comp_idx", "name", "namespace_name"),
-                ForeignKeyConstraint(("defined_in",), ("CIMProfile.name",)),
+        return (ForeignKeyConstraint(("defined_in",), ("CIMProfile.name",)),
                 ForeignKeyConstraint(("namespace_name",), ("CIMNamespace.short",)))
 
     @declared_attr

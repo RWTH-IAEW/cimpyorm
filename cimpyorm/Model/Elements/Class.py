@@ -8,7 +8,7 @@
 #   For further information see LICENSE in the project's root directory.
 #
 
-from collections import OrderedDict, defaultdict, Iterable, Sequence
+from collections import OrderedDict, defaultdict
 
 import pandas as pd
 from sqlalchemy import Column, String, ForeignKey, Integer, ForeignKeyConstraint
@@ -46,13 +46,13 @@ class CIMClass(ElementMixin, aux.Base):
     parent_namespace = Column(String(30))
 
     #: If this class inherits from a parent class, it is referenced here.
-    parent = relationship("CIMClass", foreign_keys=[parent_name, parent_namespace],
+    parent = relationship("CIMClass", foreign_keys=[parent_namespace, parent_name],
                           backref="children", remote_side="CIMClass.name")
 
-    __table_args__ = (ForeignKeyConstraint(("parent_name", "parent_namespace"),
-                                           ("CIMClass.name", "CIMClass.namespace_name")),
-                      ForeignKeyConstraint((package_name, package_namespace),
-                                           (CIMPackage.name, CIMPackage.namespace_name)),
+    __table_args__ = (ForeignKeyConstraint(("parent_namespace", "parent_name"),
+                                           ("CIMClass.namespace_name", "CIMClass.name")),
+                      ForeignKeyConstraint((package_namespace, package_name),
+                                           (CIMPackage.namespace_name, CIMPackage.name)),
                       )
 
     def __init__(self, schema_elements=None):

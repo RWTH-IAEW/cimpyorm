@@ -57,6 +57,8 @@ class CIMProp(ElementMixin, aux.Base):
     inverse_class_namespace = Column(String(30))
     #: The inverse property associated with this property (None if the property is a Primitive or
     #: an EnumValue)
+
+
     inverse = relationship("CIMProp",
                            foreign_keys=[inverse_property_name,
                            inverse_property_namespace, inverse_class_name,
@@ -70,18 +72,19 @@ class CIMProp(ElementMixin, aux.Base):
 
     type = "Generic"
 
-    __table_args__ = (ForeignKeyConstraint((cls_name, cls_namespace),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
-                      ForeignKeyConstraint((datatype_name, datatype_namespace),
-                                           (CIMDT.name,
-                                            CIMDT.namespace_name)),
-                      ForeignKeyConstraint(("inverse_property_name",
-                           "inverse_property_namespace", "inverse_class_name",
-                           "inverse_class_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
+    __table_args__ = (ForeignKeyConstraint((cls_namespace, cls_name),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
+                      ForeignKeyConstraint((datatype_namespace, datatype_name),
+                                           (CIMDT.namespace_name,
+                                            CIMDT.name)),
+                      ForeignKeyConstraint(("inverse_class_name",
+                                            "inverse_class_namespace",
+                                            "inverse_property_namespace",
+                                            "inverse_property_name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
                       )
 
     __mapper_args__ = {
@@ -377,14 +380,13 @@ class CIMProp_AlphaNumeric(CIMProp):
 
     type = "Alphanumeric"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
+    __table_args__ = (ForeignKeyConstraint(("cls_name", "cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -410,17 +412,16 @@ class CIMProp_Reference(CIMProp):
 
     type = "Reference"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
-                      ForeignKeyConstraint((range_name, range_namespace),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
+    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
+                      ForeignKeyConstraint((range_namespace, range_name),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__
@@ -446,17 +447,16 @@ class CIMProp_Enumeration(CIMProp):
 
     type = "Enumeration"
 
-    __table_args__ = (ForeignKeyConstraint(("name", "namespace_name", "cls_name",
-                                            "cls_namespace"),
-                                           ("CIMProp.name",
-                                            "CIMProp.namespace_name", "CIMProp.cls_name",
-                                            "CIMProp.cls_namespace")),
-                      ForeignKeyConstraint(("cls_name", "cls_namespace"),
-                                           (CIMClass.name,
-                                            CIMClass.namespace_name)),
-                      ForeignKeyConstraint((range_name, range_namespace),
-                                           (CIMEnum.name,
-                                            CIMEnum.namespace_name)),
+    __table_args__ = (ForeignKeyConstraint(("cls_name","cls_namespace", "namespace_name", "name"),
+                                           ("CIMProp.cls_name",
+                                            "CIMProp.cls_namespace", "CIMProp.namespace_name",
+                                            "CIMProp.name")),
+                      ForeignKeyConstraint(("cls_namespace", "cls_name"),
+                                           (CIMClass.namespace_name,
+                                            CIMClass.name)),
+                      ForeignKeyConstraint((range_namespace, range_name),
+                                           (CIMEnum.namespace_name,
+                                            CIMEnum.name)),
                       )
     __mapper_args__ = {
         "polymorphic_identity": __tablename__

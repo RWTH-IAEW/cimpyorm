@@ -44,10 +44,9 @@ prop_used_in = Table("prop_profile", aux.Base.metadata,
                     Column("prop_name", String(80)),
                     Column("prop_cls_namespace", String(80)),
                     Column("prop_cls_name", String(80)),
-                    ForeignKeyConstraint(("prop_namespace", "prop_name", "prop_cls_namespace",
-                                          "prop_cls_name"),
-                                         ("CIMProp.namespace_name", "CIMProp.name",
-                                          "CIMProp.cls_namespace", "CIMProp.cls_name"))
+                    ForeignKeyConstraint(("prop_cls_name", "prop_cls_namespace", "prop_namespace", "prop_name"),
+                                         ("CIMProp.cls_name", "CIMProp.cls_namespace",
+                                          "CIMProp.namespace_name", "CIMProp.name"))
                     )
 
 profile_dep_mandatory = Table("profile_dep_mandatory", aux.Base.metadata,
@@ -150,7 +149,7 @@ class ElementMixin:
 
     @declared_attr.cascading
     def name(cls):
-        return Column("name", String(30), primary_key=True)
+        return Column("name", String(80), primary_key=True)
 
     @declared_attr
     def __table_args__(cls):

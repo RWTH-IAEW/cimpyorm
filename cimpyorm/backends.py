@@ -50,7 +50,11 @@ class Engine(ABC):
         return ORM
 
     def connect(self):
+        self.configure()
         return self.engine, self.ORM
+
+    def configure(self):
+        pass
 
     def update_path(self, path):
         pass
@@ -79,6 +83,8 @@ class Engine(ABC):
         reload(Elements)
         reload(Schema)
         # aux.Base.metadata.create_all(self.engine)
+        self.configure()
+
         Source.SourceInfo.metadata.create_all(self.engine)
         Elements.CIMProfile.metadata.create_all(self.engine)
         Elements.CIMNamespace.metadata.create_all(self.engine)
@@ -211,6 +217,9 @@ class ClientServer(Engine):
         else:
             return self.host
 
+    def configure(self):
+        self.engine.execute(f"ALTER DATABASE {self.path} DEFAULT CHARACTER SET utf8 COLLATE `utf8_bin`;")
+
     @property
     def host(self):
         return f"{self.hostname}:{self.port}"
@@ -235,8 +244,7 @@ class ClientServer(Engine):
         except (OperationalError, InternalError):
             engine = sa.create_engine(
                 f"{self._prefix()}://{self._credentials()}@{self.host}", echo=self.echo)
-            engine.execute(f"CREATE SCHEMA {self.path} DEFAULT CHARACTER SET utf8 COLLATE "
-                           f"utf8_bin;")
+            engine.execute(f"CREATE SCHEMA {self.path};")
             engine = sa.create_engine(
                 f"{self._prefix()}://{self._credentials()}@{self.remote_path}", echo=self.echo)
         return engine

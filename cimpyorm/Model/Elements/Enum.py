@@ -73,10 +73,10 @@ class CIMEnumValue(ElementMixin, aux.Base):
     enum = relationship(CIMEnum, foreign_keys=enum_name, backref="values")
 
     fqn = Column(String(120))
-    __table_args__ = (ForeignKeyConstraint((enum_name,
-                                            enum_namespace),
-                                           (CIMEnum.name,
-                                            CIMEnum.namespace_name)),)
+    __table_args__ = (ForeignKeyConstraint((enum_namespace,
+                                            enum_name),
+                                           (CIMEnum.namespace_name,
+                                            CIMEnum.name)),)
 
     def __init__(self, schema_elements=None):
         """

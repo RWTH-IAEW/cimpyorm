@@ -46,3 +46,30 @@ jobs:
     - name: Test with pytest
       run: |
         pytest --ignore=cimpyorm/Test/Integration --ignore=cimpyorm/Test/Deployment --junitxml=pytest.xml --cov
+
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+      - name: Build dist
+        run: python -m build --sdist --wheel --outdir dist/ .
+      - name: Publish package (TEST)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TEST_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+      - name: Publish package (PRODUCTION)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

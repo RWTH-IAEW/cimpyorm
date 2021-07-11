@@ -63,7 +63,7 @@ class CIMEnum(ElementMixin, aux.Base):
         return df.to_html(**kwargs)
 
     def property_table(self):
-        return pd.DataFrame({"Values": [value.label for value in self.values]})
+        return pd.DataFrame({"Values": [value.name for value in self.values]})
 
 
 class CIMEnumValue(ElementMixin, aux.Base):

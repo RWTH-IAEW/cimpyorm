@@ -1,0 +1,2 @@
+global-exclude *.db
+recursive-include cimpyorm/res *.xml *.rdf *.json

@@ -65,8 +65,6 @@ setup(
     ],  # Optional
     # https://setuptools.readthedocs.io/en/latest/setuptools.html#dependencies-that-aren-t-in-pypi
     dependency_links=[],  # Optional
-    # https://stackoverflow.com/a/16576850
-    package_data={"cimpyorm": ["res/*"]},
     include_package_data=True,
     # https://packaging.python.org/specifications/core-metadata/#project-url-multiple-use
     project_urls={  # Optional

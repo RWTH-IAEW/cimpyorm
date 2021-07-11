@@ -1,8 +1,5 @@
 pymysql
 mysqlclient
-sphinx
-sphinx_rtd_theme
-sphinx-autodoc-typehints
 toml
 pytest
 pytest-cov

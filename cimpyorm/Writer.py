@@ -111,14 +111,14 @@ class Serializer:
                 for dep in profile.mandatory_dependencies:
                     SubElement(fm, f"{MD}Model.DependentOn",
                                   {
-                                      "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about":
+                                      "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource":
                                           f"urn:uuid:{uuids[dep.name]}"
                                   })
                 for dep in profile.optional_dependencies:
                     try:
                         SubElement(fm, f"{MD}Model.DependentOn",
                                       {
-                                          "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about":
+                                          "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource":
                                               f"urn:uuid:{uuids[dep.name]}"
                                       })
                     except KeyError:

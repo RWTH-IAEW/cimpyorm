@@ -27,7 +27,7 @@ setup(
     name='cimpyorm',  # Required
     # https://www.python.org/dev/peps/pep-0440/
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.9.4',  # Required
+    version='0.10.0',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description="A database-backed ORM for CIM datasets.",  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
@@ -39,13 +39,15 @@ setup(
     author_email="t.offergeld@iaew.rwth-aachen.de",  # Optional
     # For a list of valid classifiers, see https://pypi.org/classifiers/
     classifiers=[
-        'Development Status :: 3 - Alpha', 'Intended Audience :: Developers',
+        'Development Status :: 3 - Alpha', 
+        'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: BSD License', 'Natural Language :: English',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8'
+        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 3.10'
+        'Programming Language :: Python :: 3.11'
     ],  # Optional
     packages=find_packages(exclude=[
         'cimpyorm/Test/Deployment/**',

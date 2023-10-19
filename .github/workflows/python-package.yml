@@ -61,12 +61,6 @@ jobs:
           python -m pip install build
       - name: Build dist
         run: python -m build --sdist --wheel --outdir dist/ .
-      - name: Publish package (TEST)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TEST_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
       - name: Publish package (PRODUCTION)
         if: startsWith(github.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@release/v1

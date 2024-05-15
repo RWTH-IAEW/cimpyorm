@@ -57,7 +57,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'Click',
-        'sqlalchemy',
+        'sqlalchemy (<= 1.3.15)',
         'networkx',
         'numpy',
         'lxml',

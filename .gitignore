@@ -9,3 +9,4 @@
 /docs/_build/
 /.venv*/
 **/.ipynb_checkpoints/*
+.env

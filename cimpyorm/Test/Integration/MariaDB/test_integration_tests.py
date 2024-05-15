@@ -12,10 +12,11 @@ import cimpyorm.auxiliary
 from cimpyorm.api import load, parse
 import pytest
 import cimpyorm
+import os
 
 from cimpyorm.backends import MariaDB
 
-
+@pytest.mark.skipif(os.environ.get("MARIADB_SKIP_TEST", False), reason="Environ Var MARIADB_SKIP_TEST is set to True ")
 def test_parse_load(full_grid):
     try:
         cimpyorm.auxiliary.get_path("SCHEMAROOT")
@@ -28,7 +29,7 @@ def test_parse_load(full_grid):
     session.close()
     MariaDB(path=path, host="localhost").drop()
 
-
+@pytest.mark.skipif(os.environ.get("MARIADB_SKIP_TEST", False), reason="Environ Var MARIADB_SKIP_TEST is set to True ")
 def test_parse_parse(full_grid):
     try:
         cimpyorm.auxiliary.get_path("SCHEMAROOT")

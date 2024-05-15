@@ -12,10 +12,10 @@ import cimpyorm.auxiliary
 from cimpyorm.api import load, parse
 import pytest
 import cimpyorm
-
+import os 
 from cimpyorm.backends import MySQL
 
-
+@pytest.mark.skipif(os.environ.get("MYSQL_SKIP_TEST", False), reason="Environ Var MYSQL_SKIP_TEST is set to True ")
 def test_parse_load(full_grid):
     try:
         cimpyorm.auxiliary.get_path("SCHEMAROOT")
@@ -28,7 +28,7 @@ def test_parse_load(full_grid):
     session.close()
     MySQL(path=path, host="localhost").drop()
 
-
+@pytest.mark.skipif(os.environ.get("MYSQL_SKIP_TEST", False), reason="Environ Var MYSQL_SKIP_TEST is set to True ")
 def test_parse_parse(full_grid):
     try:
         cimpyorm.auxiliary.get_path("SCHEMAROOT")

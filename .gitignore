@@ -8,5 +8,5 @@
 /cimpyorm/config.ini
 /docs/_build/
 /.venv*/
-/.vscode/
 **/.ipynb_checkpoints/*
+.env

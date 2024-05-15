@@ -19,7 +19,7 @@ from zipfile import ZipFile
 from sqlalchemy.orm.session import Session
 from pandas import DataFrame, pivot_table
 from tqdm import tqdm
-from defusedxml.lxml import tostring
+from lxml.etree import tostring
 from lxml.etree import _ElementTree # nosec: Used for typechecking
 
 from cimpyorm.auxiliary import get_logger, get_path, find_rdfs_path

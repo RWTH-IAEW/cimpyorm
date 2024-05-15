@@ -7,4 +7,4 @@ pandas
 tabulate
 tqdm
 click
-defusedxml < 0.7
+

@@ -1,5 +1,0 @@
-pymysql
-mysqlclient
-toml
-pytest
-pytest-cov

@@ -63,8 +63,7 @@ setup(
         'lxml',
         'pandas',
         'tabulate',
-        'tqdm',
-        'defusedxml (<0.7.0)'
+        'tqdm'
     ],  # Optional
     # https://setuptools.readthedocs.io/en/latest/setuptools.html#dependencies-that-aren-t-in-pypi
     dependency_links=[],  # Optional

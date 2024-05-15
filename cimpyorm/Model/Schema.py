@@ -13,7 +13,7 @@ from argparse import Namespace
 import os
 from collections import ChainMap, defaultdict
 from collections.abc import Iterable
-from defusedxml.lxml import parse
+from lxml.etree import parse
 import networkx as nx
 from networkx import DiGraph, bfs_tree, dfs_tree
 from networkx.exception import NetworkXNoPath

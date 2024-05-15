@@ -13,7 +13,7 @@ from importlib.resources import path
 import os
 import inspect
 
-from defusedxml.lxml import fromstring
+from lxml.etree import fromstring
 
 from cimpyorm import parse, backends
 from cimpyorm.Test import test_datasets

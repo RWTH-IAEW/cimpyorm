@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Union
 from functools import lru_cache
 
-from defusedxml.lxml import parse
+from lxml.etree import parse
 from sqlalchemy import Column, Integer, String, TEXT
 
 from cimpyorm.auxiliary import HDict
